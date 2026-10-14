@@ -1,0 +1,7 @@
+{
+  "rewrites": [
+    { "source": "/api/:path*", "destination": "https://api-finances-alpha.vercel.app/api/:path*" },
+    { "source": "/health", "destination": "https://api-finances-alpha.vercel.app/health" },
+    { "source": "/((?!assets/).*)", "destination": "/index.html" }
+  ]
+}
