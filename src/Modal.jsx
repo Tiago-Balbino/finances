@@ -32,11 +32,13 @@ export default function Modal({ modal, data, onClose, onSave }) {
   const [kind, setKind] = useState(record.kind || 'expense');
   const [interestPeriod, setInterestPeriod] = useState(record.interest_period || 'monthly');
   const [expenseType, setExpenseType] = useState(record.expense_type || 'eventual');
+  const [yieldRateId, setYieldRateId] = useState(String(record.yield_rate_id || ''));
   const title = ({ account: record.id ? 'Editar conta' : 'Nova conta', bill: record.id ? 'Editar despesa' : 'Nova despesa',
     transaction: record.id ? 'Editar lançamento' : 'Novo lançamento', investment: 'Novo investimento',
     payment: 'Registrar pagamento', interest: 'Juros da despesa', category: record.id ? 'Renomear categoria' : 'Nova categoria',
     subcategory: record.id ? 'Renomear subcategoria' : 'Nova subcategoria', password: 'Trocar senha',
-    user: 'Nova pessoa', resetUser: 'Definir nova senha', billNote: 'Editar observações', classification: 'Classificar despesa' })[type];
+    user: 'Nova pessoa', resetUser: 'Definir nova senha', billNote: 'Editar observações', classification: 'Classificar despesa',
+    yieldRate: record.id ? 'Editar taxa de referência' : 'Nova taxa de referência' })[type];
   const accounts = data.accounts.map(item => [item.id, item.name]);
   const selectedAccount = String(record.account_id || data.accounts[0]?.id || '');
   const noteField = <Field label="Observações (opcional)" name="note" type="textarea" value={record.note} required={false} wide />;
@@ -54,6 +56,9 @@ export default function Modal({ modal, data, onClose, onSave }) {
           <Field label="Nome da conta" name="name" value={record.name} maxLength={120} />
           <Select label="Tipo de conta" name="type" value={record.type || 'Conta corrente'} options={['Conta corrente', 'Poupança', 'Carteira', 'Outro'].map(item => [item, item])} />
           <Field label="Saldo inicial (R$)" name="opening" type="number" value={decimal(record.opening_cents)} min="0" step="0.01" />{noteField}
+          <Select label="Taxa de rendimento" name="yieldRateId" value={yieldRateId} onChange={event => setYieldRateId(event.target.value)} options={data.yield_rates.map(item => [item.id, `${item.name} · ${decimal(item.annual_basis_points)}% a.a.`])} required={false} />
+          {yieldRateId && <><Field label="Percentual da taxa (%)" name="yieldMultiplier" type="number" value={record.yield_rate_id ? decimal(record.yield_multiplier_basis_points) : '100.00'} min="0" max="1000" step="0.01" />
+            <p className="form-hint wide">Exemplo: 105% de uma taxa de referência de 10% ao ano equivale a 10,5% ao ano. O rendimento usa o saldo da conta às 8h e é creditado a partir desse horário em dias úteis.</p></>}
         </>}
         {type === 'bill' && <>
           <Field label="Nome da despesa" name="description" value={record.description} maxLength={120} wide />
@@ -85,6 +90,9 @@ export default function Modal({ modal, data, onClose, onSave }) {
           <Select label="Periodicidade" name="period" value="monthly" options={[["monthly", "Ao mês"], ["yearly", "Ao ano"], ["daily", "Ao dia"]]} />
           <Field label="Data inicial" name="startDate" type="date" value={data.today} />{noteField}
         </>}
+        {type === 'yieldRate' && <><Field label="Nome da taxa" name="name" value={record.name} maxLength={80} placeholder="Ex.: CDI" />
+          <Field label="Valor da taxa (% ao ano)" name="annualRate" type="number" value={record.id ? decimal(record.annual_basis_points) : ''} min="0" max="100" step="0.01" />
+          <p className="form-hint wide">Cadastre aqui o valor anual da taxa de referência. Cada conta escolhe uma taxa e o percentual aplicado a ela.</p></>}
         {type === 'payment' && <>
           <p className="form-hint wide">Saldo atualizado de <b>{brl(record.current_cents)}</b>. Pagamentos parciais são aceitos.</p>
           <Select label="Pagar pela conta" name="accountId" value={selectedAccount} options={accounts} />

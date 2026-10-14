@@ -5,7 +5,7 @@ import Modal from './Modal.jsx';
 
 const nav = [
   ['overview', '◫', 'Visão geral'], ['accounts', '▤', 'Contas'], ['bills', '◷', 'Despesas'],
-  ['transactions', '⇄', 'Lançamentos'], ['categories', '▦', 'Categorias'],
+  ['transactions', '⇄', 'Lançamentos'], ['categories', '▦', 'Categorias'], ['yieldRates', '％', 'Taxas'],
   ['investments', '◈', 'Investimentos'], ['users', '♙', 'Pessoas'], ['profile', '⚙', 'Perfil']
 ];
 
@@ -22,7 +22,7 @@ function TransactionTable({ items, onEdit, onDelete, compact = false }) {
     <td><span className="pill">{item.category}</span>{item.subcategory_name && <span className="sub-label">{item.subcategory_name}</span>}</td>
     <td className="muted">{item.account_name}</td><td className="muted">{day(item.date)}</td>
     <td className={item.kind === 'income' ? 'amount-plus' : 'amount-minus'}>{item.kind === 'income' ? '+' : '−'} {brl(item.amount_cents)}</td>
-    {!compact && <td>{item.bill_id ? <span className="muted">Pagamento</span> : <div className="table-actions"><button className="button tiny ghost" onClick={() => onEdit(item)}>Editar</button><button className="button tiny ghost" onClick={() => onDelete(item.id)}>Excluir</button></div>}</td>}
+    {!compact && <td>{item.bill_id ? <span className="muted">Pagamento</span> : item.automatic_yield ? <span className="muted">Rendimento automático</span> : <div className="table-actions"><button className="button tiny ghost" onClick={() => onEdit(item)}>Editar</button><button className="button tiny ghost" onClick={() => onDelete(item.id)}>Excluir</button></div>}</td>}
   </tr>)}</tbody></table></div>;
 }
 
@@ -48,6 +48,7 @@ export default function App() {
   const [chartRange, setChartRange] = useState(12);
   const [billFilter, setBillFilter] = useState('all');
   const [expenseTypeFilter, setExpenseTypeFilter] = useState('all');
+  const [billMonthOffset, setBillMonthOffset] = useState(0);
   const [categoryFilter, setCategoryFilter] = useState('all');
   const [categoryKind, setCategoryKind] = useState('expense');
   const [transactionFilter, setTransactionFilter] = useState('all');
@@ -84,10 +85,11 @@ export default function App() {
   async function saveModal(current, values) {
     const { type, record } = current;
     const selected = { categoryId: Number(values.categoryId), subcategoryId: values.subcategoryId ? Number(values.subcategoryId) : null };
-    if (type === 'account') return change(record?.id ? `/api/accounts/${record.id}` : '/api/accounts', record?.id ? 'PATCH' : 'POST', { name: values.name, type: values.type, openingCents: cents(values.opening), note: values.note });
+    if (type === 'account') return change(record?.id ? `/api/accounts/${record.id}` : '/api/accounts', record?.id ? 'PATCH' : 'POST', { name: values.name, type: values.type, openingCents: cents(values.opening), note: values.note, yieldRateId: values.yieldRateId ? Number(values.yieldRateId) : null, yieldMultiplierBasisPoints: rate(values.yieldMultiplier || '100') });
     if (type === 'bill') return change(record?.id ? `/api/bills/${record.id}` : '/api/bills', record?.id ? 'PATCH' : 'POST', { accountId: Number(values.accountId), description: values.description, expenseType: values.expenseType, ...selected, note: values.note, amountCents: cents(values.amount), dueDate: values.dueDate, interestRateBasisPoints: rate(values.interestRate), interestPeriod: values.interestPeriod });
     if (type === 'transaction') return change(record?.id ? `/api/transactions/${record.id}` : '/api/transactions', record?.id ? 'PATCH' : 'POST', { kind: values.kind, accountId: Number(values.accountId), description: values.description, ...selected, note: values.note, amountCents: cents(values.amount), date: values.date });
     if (type === 'investment') return change('/api/investments', 'POST', { name: values.name, type: values.type, principalCents: cents(values.principal), rateBasisPoints: rate(values.rate), period: values.period, startDate: values.startDate, note: values.note });
+    if (type === 'yieldRate') return change(record?.id ? `/api/yield-rates/${record.id}` : '/api/yield-rates', record?.id ? 'PATCH' : 'POST', { name: values.name, annualBasisPoints: rate(values.annualRate) });
     if (type === 'payment') return change(`/api/bills/${record.id}/payments`, 'POST', { accountId: Number(values.accountId), amountCents: cents(values.amount), date: values.date, note: values.note });
     if (type === 'interest') return change(`/api/bills/${record.id}/interest`, 'PATCH', { interestRateBasisPoints: rate(values.interestRate), interestPeriod: values.interestPeriod });
     if (type === 'billNote') return change(`/api/bills/${record.id}/note`, 'PATCH', { note: values.note });
@@ -121,16 +123,44 @@ export default function App() {
       <div className="stat"><div className="stat-top"><span className="stat-label">Contas a pagar</span><span className="stat-symbol rose">◷</span></div><div className="stat-value">{brl(debt)}</div><div className="stat-foot">{openBills.length} em aberto · {overdue.length} vencidas</div></div>
       <div className="stat"><div className="stat-top"><span className="stat-label">Balanço do mês</span><span className="stat-symbol">⇄</span></div><div className={`stat-value ${income - expense < 0 ? 'amount-minus' : 'amount-plus'}`}>{brl(income - expense)}</div><div className="stat-foot">{brl(income)} entradas · {brl(expense)} saídas</div></div></section>
     <div className="grid-two charts-grid"><section className="panel chart-panel spending-panel"><div className="panel-header"><div><div className="eyebrow">GASTOS REAIS · MÊS ATUAL</div><h2>Para onde foi o dinheiro?</h2><p>Clique em uma categoria para ver subcategorias e pagamentos.</p></div><span className="pill">{brl(expense)}</span></div><SpendingChart rows={data.monthly_spending} transactions={monthlyTransactions} /></section>
-      <section className="panel chart-panel"><div className="panel-header"><div><div className="eyebrow">PLANEJAMENTO</div><h2>Próximos vencimentos</h2><p>Valores abertos por mês</p></div><button className="link-button" onClick={() => setView('bills')}>Ver despesas →</button></div><DueChart series={data.due_series} /><div className="chart-caption">Despesas vencidas aparecem no mês atual.</div></section></div>
+      <section className="panel chart-panel"><div className="panel-header"><div><div className="eyebrow">PLANEJAMENTO</div><h2>Contas a pagar por mês</h2><p>Inclui pendências de meses anteriores.</p></div><button className="link-button" onClick={() => setView('bills')}>Ver despesas →</button></div><DueChart series={data.due_series} /><div className="chart-caption">Despesas não pagas continuam nos meses seguintes.</div></section></div>
     <div className="grid-two"><section className="panel chart-panel"><div className="panel-header"><div><div className="eyebrow">PROJEÇÃO</div><h2>Investimentos</h2><p>Juros compostos ao longo do tempo</p></div><RangeButtons value={chartRange} onChange={setChartRange} /></div><LineChart series={data.investment_series.slice(0, chartRange + 1)} title="Projeção de investimentos" /></section>
       <section className="panel"><div className="panel-header"><div><h2>Despesas em atenção</h2><p>Vencidas e próximas do prazo</p></div><button className="link-button" onClick={() => setView('bills')}>Ver todas →</button></div>{openBills.length ? <div className="attention-list">{[...openBills].sort((a, b) => a.due_date.localeCompare(b.due_date)).slice(0, 5).map(item => <button className="attention-row" key={item.id} onClick={() => setView('bills')}><span className={`attention-dot ${item.status}`} /><span><strong>{item.description}</strong><small>{item.category} · {item.status === 'overdue' ? `${item.days_overdue} dias de atraso` : `Vence ${day(item.due_date)}`}</small></span><b>{brl(item.current_cents)}</b></button>)}</div> : <Empty>Nenhuma despesa em aberto.</Empty>}</section></div>
   </>;
-  if (view === 'accounts') page = <><Header title="Contas" subtitle="Cada conta com seu saldo e suas anotações." action="Nova conta" onAction={() => open('account')} /><div className="cards">{data.accounts.map(item => <article className="item-card" key={item.id}><div className="item-top"><span className="account-icon">▤</span><span className="pill">{item.type}</span></div><h3>{item.name}</h3>{item.note && <p className="card-note">{item.note}</p>}<small>Saldo atual</small><div className="big-value">{brl(item.balance_cents)}</div><div className="divider" /><div className="flex"><span>Saldo inicial</span><b>{brl(item.opening_cents)}</b></div><div className="item-actions"><button className="button tiny secondary" onClick={() => open('account', item)}>Editar</button><button className="button tiny ghost" onClick={() => remove(`/api/accounts/${item.id}`)}>Excluir</button></div></article>)}</div>{!data.accounts.length && <div className="panel"><Empty>Cadastre a primeira conta.</Empty></div>}</>;
+  if (view === 'accounts') page = <>
+    <Header title="Contas" subtitle="Acompanhe saldos e configure rendimentos passivos." action="Nova conta" onAction={() => open('account')} />
+    <div className="cards">{data.accounts.map(item => <article className="item-card" key={item.id}>
+      <div className="item-top"><span className="account-icon">▤</span><span className="pill">{item.type}</span></div>
+      <h3>{item.name}</h3>{item.note && <p className="card-note">{item.note}</p>}
+      <small>Saldo atual</small><div className="big-value">{brl(item.balance_cents)}</div><div className="divider" />
+      <div className="flex"><span>Saldo inicial</span><b>{brl(item.opening_cents)}</b></div>
+      {item.yield_rate_id && <div className="flex"><span>Rendimento</span><b>{decimal(item.yield_multiplier_basis_points)}% de {item.yield_rate_name} · {decimal(Math.round(item.yield_annual_basis_points * item.yield_multiplier_basis_points / 10000))}% a.a.</b></div>}
+      <div className="item-actions"><button className="button tiny secondary" onClick={() => open('account', item)}>Editar</button><button className="button tiny ghost" onClick={() => remove(`/api/accounts/${item.id}`)}>Excluir</button></div>
+    </article>)}</div>
+    {!data.accounts.length && <div className="panel"><Empty>Cadastre a primeira conta.</Empty></div>}
+    <p className="muted">Configure as taxas de referência na aba <button className="link-button" onClick={() => setView('yieldRates')}>Taxas →</button></p>
+  </>;
+  if (view === 'yieldRates') page = <>
+    <Header title="Taxas de referência" subtitle="Cadastre o valor anual de taxas como CDI para usar nos rendimentos das contas." action="Nova taxa" onAction={() => open('yieldRate')} />
+    <div className="cards">{data.yield_rates.map(item => <article className="item-card" key={item.id}>
+      <div className="item-top"><span className="account-icon">％</span><span className="pill">Taxa anual</span></div>
+      <h3>{item.name}</h3><div className="big-value">{decimal(item.annual_basis_points)}%</div>
+      <div className="item-actions"><button className="button tiny secondary" onClick={() => open('yieldRate', item)}>Editar</button><button className="button tiny ghost" onClick={() => remove(`/api/yield-rates/${item.id}`)}>Excluir</button></div>
+    </article>)}</div>
+    {!data.yield_rates.length && <div className="panel"><Empty>Cadastre uma taxa para configurar rendimentos passivos nas contas.</Empty></div>}
+  </>;
   if (view === 'bills') {
     const immediate = data.transactions.filter(item => item.kind === 'expense' && !item.bill_id);
     const filtered = data.bills.filter(item => (billFilter === 'all' || item.status === billFilter) && (expenseTypeFilter === 'all' || (item.expense_type || 'eventual') === expenseTypeFilter) && (categoryFilter === 'all' || String(item.category_id) === categoryFilter));
+    const selectedMonth = data.due_series[billMonthOffset] || data.due_series[0];
+    const monthBills = (selectedMonth?.items || []).map(entry => ({ ...entry, bill: data.bills.find(item => item.id === entry.id) })).filter(entry => entry.bill);
+    const monthLabel = selectedMonth ? new Intl.DateTimeFormat('pt-BR', { month: 'long', year: 'numeric' }).format(new Date(`${selectedMonth.date.slice(0, 7)}-01T12:00:00`)) : '';
     page = <><Header title="Despesas" subtitle="Planeje vencimentos, acompanhe juros e registre pagamentos." action="Nova despesa" onAction={() => data.accounts.length ? open('bill') : setMessage('Cadastre uma conta primeiro.')} />
       <section className="debt-summary"><div><span>Em aberto</span><strong>{brl(debt)}</strong><small>{openBills.length} despesas para acompanhar</small></div><div><span>Vencidas</span><strong>{brl(overdue.reduce((sum, item) => sum + (item.current_cents || 0), 0))}</strong><small>{overdue.length} com prazo ultrapassado</small></div><div><span>Quitadas</span><strong>{data.bills.filter(item => item.status === 'paid').length + immediate.length}</strong><small>Inclui saídas imediatas</small></div></section>
+      <section className="panel monthly-payables"><div className="panel-header"><div><div className="eyebrow">CONTAS POR MÊS</div><h2>O que pagar em {monthLabel}</h2><p>Despesas anteriores sem pagamento continuam nos meses seguintes até serem quitadas.</p></div><div className="month-navigation"><button className="button tiny secondary" disabled={billMonthOffset === 0} onClick={() => setBillMonthOffset(value => value - 1)} aria-label="Mês anterior">←</button><button className="button tiny secondary" disabled={billMonthOffset >= data.due_series.length - 1} onClick={() => setBillMonthOffset(value => value + 1)} aria-label="Próximo mês">→</button></div></div>
+        <div className="monthly-total"><span>Total previsto para o mês</span><strong>{brl(selectedMonth?.value_cents || 0)}</strong></div>
+        {monthBills.length ? <div className="monthly-list">{monthBills.map(({ bill, value_cents, carried }) => <div className="monthly-row" key={bill.id}><div><strong>{bill.description}</strong><small>{carried ? `Pendente desde ${day(bill.due_date)}` : `Vence ${day(bill.due_date)}`} · {bill.account_name}</small></div><span className={carried ? 'pill carry-pill' : 'pill'}>{carried ? 'Anterior' : 'Deste mês'}</span><b>{brl(value_cents)}</b></div>)}</div> : <Empty>Nenhuma conta a pagar neste mês.</Empty>}
+      </section>
       <section className="panel chart-panel debt-chart"><div className="panel-header"><div><div className="eyebrow">CENÁRIO</div><h2>Se nada mais for pago</h2><p>Saldo devedor projetado com juros</p></div><RangeButtons value={chartRange} onChange={setChartRange} /></div><LineChart series={data.debt_series.slice(0, chartRange + 1)} title="Projeção de dívidas" accent="#dca792" /></section>
       <div className="section-heading"><div><h2>Contas a pagar</h2><p>Filtre e selecione uma despesa para registrar pagamentos.</p></div><div className="filter-row">{[['all', 'Todas'], ['pending', 'Pendentes'], ['overdue', 'Vencidas'], ['paid', 'Pagas']].map(([value, label]) => <button key={value} className={`filter ${billFilter === value ? 'active' : ''}`} onClick={() => setBillFilter(value)}>{label}</button>)}</div></div>
       <div className="inline-filter"><label htmlFor="bill-type-filter">Tipo</label><select id="bill-type-filter" value={expenseTypeFilter} onChange={event => setExpenseTypeFilter(event.target.value)}><option value="all">Todos os tipos</option><option value="fixed">Fixas</option><option value="eventual">Eventuais</option></select><label htmlFor="bill-category-filter">Categoria</label><select id="bill-category-filter" value={categoryFilter} onChange={event => setCategoryFilter(event.target.value)}><option value="all">Todas as categorias</option>{categoryOptions.map(item => <option key={item.id} value={item.id}>{item.name}</option>)}</select></div>
