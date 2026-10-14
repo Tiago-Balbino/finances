@@ -17,6 +17,7 @@ function Report({ simulation }) {
   const { summary, result } = simulation;
   const short = summary.year_gap_cents > 0;
   const hasDebt = result.timeline.some(month => month.debt_cents > 0);
+  const withCash = result.timeline[0]?.opening_cash_cents != null;
   return <>
     <section className="stats month-stats four">
       <Stat label="Para ficar em dia hoje" value={brl(summary.need_today_cents)} detail={`${brl(summary.overdue_cents)} atrasado (${summary.overdue_count}) + ${brl(summary.this_month_cents)} deste mês (${summary.this_month_count})`} tone="featured" />
@@ -24,19 +25,19 @@ function Report({ simulation }) {
       <Stat label="Tempo para quitar" value={payoffText(summary)} detail={summary.months_to_payoff == null ? `Em 5 anos ainda ficam ${brl(summary.unpaid_at_horizon_cents)} em aberto` : `Tudo quitado em ${day(summary.payoff_date)}`} tone={summary.months_to_payoff == null ? 'negative' : summary.months_to_payoff === 0 ? 'positive' : ''} />
       <Stat label="Juros e multas no caminho" value={brl(summary.interest_cents)} detail="O que as atrasadas ainda vão custar até serem pagas" tone={summary.interest_cents ? 'negative' : 'positive'} />
     </section>
-    <section className="panel simulation-year"><div className="panel-header"><div><div className="eyebrow">PRÓXIMOS 12 MESES</div><h2>{short ? `Faltam ${brl(summary.year_gap_cents)} para pagar tudo o que está previsto` : `Sobram ${brl(-summary.year_gap_cents)} depois de pagar tudo o que está previsto`}</h2><p>Despesas em aberto e previstas (inclusive fixas e faturas) comparadas com o saldo de hoje e as entradas previstas, pelo valor atual, sem juros futuros.</p></div></div>
+    <section className="panel simulation-year"><div className="panel-header"><div><div className="eyebrow">PRÓXIMOS 12 MESES</div><h2>{short ? `Faltam ${brl(summary.year_gap_cents)} para pagar tudo o que vence até ${summary.year_end ? day(summary.year_end) : 'o fim de 12 meses'}` : `Sobram ${brl(-summary.year_gap_cents)} depois de pagar tudo o que vence até ${summary.year_end ? day(summary.year_end) : 'o fim de 12 meses'}`}</h2><p>Tudo o que vence nos próximos 12 meses (atrasadas, fixas, eventuais e faturas), com os juros e multas que a simulação calcula, comparado com o saldo de hoje e as entradas previstas no período.</p></div></div>
       <div className="simulation-equation">
-        <div><span>Previsto para pagar</span><strong>{brl(summary.year_bills_cents)}</strong></div><b>−</b>
-        <div><span>Saldo + previsto para entrar</span><strong>{brl(summary.balance_cents + summary.year_incomes_cents)}</strong></div><b>=</b>
-        <div className={short ? 'is-short' : 'is-ok'}><span>{short ? 'Precisaria entrar a mais' : 'Folga'}</span><strong>{brl(Math.abs(summary.year_gap_cents))}</strong>{short && <small>≈ {brl(summary.monthly_extra_needed_cents)} por mês</small>}</div>
+        <div><span>A pagar em 12 meses (com juros)</span><strong>{brl(summary.year_bills_cents)}</strong></div><b>−</b>
+        <div><span>Saldo de hoje + entradas</span><strong>{brl(summary.balance_cents + summary.year_incomes_cents)}</strong></div><b>=</b>
+        <div className={short ? 'is-short' : 'is-ok'}><span>{short ? 'Precisaria entrar a mais' : 'Sobra no fim do período'}</span><strong>{brl(Math.abs(summary.year_gap_cents))}</strong>{short && <small>≈ {brl(summary.monthly_extra_needed_cents)} por mês</small>}</div>
       </div>
     </section>
     <section className="panel chart-panel"><div className="panel-header"><div><div className="eyebrow">EVOLUÇÃO</div><h2>Dívida em aberto mês a mês</h2><p>Usando 100% de tudo que entra para pagar, começando pelas de maior juros.</p></div></div>
       {hasDebt ? <LineChart series={result.timeline.map(month => ({ date: month.month, value_cents: month.debt_cents }))} title="Dívida em aberto na simulação" accent="#dca792" /> : <div className="chart-empty"><span>✓</span>Nenhuma dívida fica em aberto no fim de nenhum mês.</div>}
     </section>
-    <section className="panel"><div className="panel-header"><div><div className="eyebrow">PLANO</div><h2>Como seria o pagamento</h2><p>Abra um mês para ver cada pagamento. O dinheiro que sobra passa para o mês seguinte.</p></div></div>
+    <section className="panel"><div className="panel-header"><div><div className="eyebrow">PLANO</div><h2>Como seria o pagamento</h2><p>Em cada mês: caixa do início + o que entra − o que é pago = caixa do fim, que passa para o mês seguinte. Abra um mês para ver cada pagamento.</p>{!withCash && <p className="form-hint">Simulação antiga, sem o caixa mês a mês. Gere uma nova para ver a conta completa.</p>}</div></div>
       <div className="simulation-months">{result.timeline.map(month => <details key={month.month} className="simulation-month">
-        <summary><span>{capitalized(monthName(month.month))}</span><small>Entra {brl(month.income_cents)} · paga {brl(month.paid_cents)}</small><b className={month.debt_cents ? 'amount-minus' : 'amount-plus'}>{month.debt_cents ? `${brl(month.debt_cents)} em aberto` : 'Em dia'}</b></summary>
+        <summary><span>{capitalized(monthName(month.month))}</span><small>{withCash ? `Caixa ${brl(month.opening_cash_cents)} + entra ${brl(month.income_cents)} − paga ${brl(month.paid_cents)} = ${brl(month.closing_cash_cents)}` : `Entra ${brl(month.income_cents)} · paga ${brl(month.paid_cents)}`}</small><b className={month.debt_cents ? 'amount-minus' : 'amount-plus'}>{month.debt_cents ? `${brl(month.debt_cents)} em aberto` : 'Em dia'}</b></summary>
         {month.payments.length ? month.payments.map((payment, index) => <div className="payment-row" key={index}><span>{day(payment.date)} · {payment.description}<small className="row-note">{payment.settled ? 'Quitada' : 'Pagamento parcial'}{payment.late ? ` · venceu em ${day(payment.due_date)}` : ''}</small></span><b>{brl(payment.amount_cents)}</b></div>) : <p className="card-note">Nenhum pagamento neste mês.</p>}
       </details>)}</div>
     </section>
@@ -67,7 +68,7 @@ export default function Simulation({ setMessage }) {
   }
   return <>
     <Header title="Simulação" subtitle="E se tudo que entrar for usado para pagar as contas? Quanto tempo leva e quanto você precisa hoje." action={busy ? 'Simulando...' : 'Nova simulação'} onAction={busy ? undefined : run} />
-    <p className="simulation-rules">Usa o saldo de hoje das contas (sem investimentos e limite garantido) e 100% das entradas previstas, inclusive salários fixos, por até 5 anos. Em cada data, paga primeiro as contas vencidas com maior juros; juros e multas continuam correndo sobre o que ficar para trás. Despesas fixas e faturas do cartão entram conforme vencem.</p>
+    <p className="simulation-rules">Considera que tudo o que está previsto entra na data certa (as entradas atrasadas, hoje) e que 100% do dinheiro vai para as contas, começando pelo saldo de hoje das contas (sem investimentos e limite garantido), por até 5 anos. A cada entrada: paga o que vence no dia, guarda o necessário para as contas que vencem antes da próxima entrada (para pagá-las em dia) e usa o resto nas atrasadas, começando pela de maior juros. Juros e multas continuam correndo sobre o que ficar para trás.</p>
     {error && <div className="panel dashboard-error" role="alert">{error}</div>}
     {selected ? <>
       <div className="simulation-meta"><span>Simulação de {dateTime(selected.created_at)}{selected.user_name ? ` · por ${selected.user_name}` : ''}</span></div>
