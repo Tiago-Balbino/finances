@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { SourceList } from './Charts.jsx';
+import { CategoryStrip } from './Charts.jsx';
 import MonthPicker, { useApi } from './MonthPicker.jsx';
 import { brl, methodName } from './lib.js';
 import { Header, Progress, Stat, TransactionTable } from './ui.jsx';
@@ -25,12 +25,10 @@ export default function Transactions({ data, open, remove, setMessage }) {
           <div className="method-split">{Object.entries(methodName).map(([key, label]) => <div key={key}><span>{label}</span><b>{brl(report.by_method[key])}</b><Progress value={report.by_method[key]} total={report.expense_cents} /></div>)}</div>
         </Stat>
       </section>
-      <div className="grid-two dashboard-charts transactions-layout">
-        <section className="panel"><div className="panel-header"><div><h2>Lançamentos do mês</h2><p>Pagamentos de despesas, recebimentos e rendimentos ficam nas próprias páginas.</p></div><div className="filter-row">{[['all', 'Todos'], ['expense', 'Saídas'], ['credit', 'Cartão'], ['income', 'Entradas']].map(([value, label]) => <button key={value} className={`filter ${filter === value ? 'active' : ''}`} onClick={() => setFilter(value)}>{label}</button>)}</div></div>
-          <TransactionTable items={items} onEdit={item => open('transaction', item)} onDelete={(id, confirmation) => remove(`/api/transactions/${id}`, confirmation)} />
-        </section>
-        <section className="panel"><div className="panel-header"><div><div className="eyebrow">SAÍDAS</div><h2>Onde foi o dinheiro</h2><p>Saídas avulsas por categoria.</p></div></div><SourceList rows={report.by_category} empty="As saídas avulsas do mês aparecerão aqui." unit="das saídas avulsas" /></section>
-      </div>
+      <section className="panel"><div className="panel-header"><div><div className="eyebrow">POR CATEGORIA</div><h2>Onde foi o dinheiro</h2><p>Saídas avulsas do mês, compras no cartão pelo total.</p></div><span className="pill">{brl(report.expense_cents)}</span></div><CategoryStrip rows={report.by_category} empty="As saídas avulsas do mês aparecerão aqui." /></section>
+      <section className="panel direct-expenses"><div className="panel-header"><div><div className="eyebrow">DIA A DIA</div><h2>Lançamentos do mês</h2><p>Pagamentos de despesas, recebimentos e rendimentos ficam nas próprias páginas.</p></div><div className="filter-row">{[['all', 'Todos'], ['expense', 'Saídas'], ['credit', 'Cartão'], ['income', 'Entradas']].map(([value, label]) => <button key={value} className={`filter ${filter === value ? 'active' : ''}`} onClick={() => setFilter(value)}>{label}</button>)}</div></div>
+        <div className="hidden-scroll tall"><TransactionTable items={items} onEdit={item => open('transaction', item)} onDelete={(id, confirmation) => remove(`/api/transactions/${id}`, confirmation)} /></div>
+      </section>
     </>}
   </>;
 }

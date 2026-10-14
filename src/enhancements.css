@@ -242,3 +242,34 @@ button:focus-visible, a:focus-visible, .chart-point:focus-visible { outline: 2px
   html, body { overscroll-behavior-y: none; }
   button, a { -webkit-tap-highlight-color: transparent; }
 }
+.hidden-scroll.tall { max-height: 560px; }
+.direct-expenses .panel-header { flex-wrap: wrap; }
+.simulation-rules { margin: -14px 0 20px; max-width: 900px; color: var(--muted); font-size: 12px; line-height: 1.6; }
+.simulation-meta { margin: -6px 0 14px; color: var(--muted); font-size: 11px; }
+.simulation-equation { display: grid; grid-template-columns: 1fr auto 1fr auto 1fr; align-items: center; gap: 12px; padding: 0 24px 22px; }
+.simulation-equation > div { border: 1px solid var(--border); border-radius: 12px; background: #1c1511; padding: 14px 16px; }
+.simulation-equation span, .simulation-equation small { display: block; color: var(--muted); font-size: 11px; }
+.simulation-equation strong { display: block; margin-top: 6px; color: var(--text); font: 700 20px Georgia, serif; }
+.simulation-equation > b { color: var(--muted); font-size: 20px; }
+.simulation-equation .is-short strong { color: #ec9a88; }
+.simulation-equation .is-ok strong { color: #b4cc9b; }
+.simulation-months { display: grid; gap: 6px; padding: 0 20px 20px; }
+.simulation-month { border: 1px solid var(--border); border-radius: 12px; background: #1c1511; padding: 0 14px; }
+.simulation-month summary { display: grid; grid-template-columns: minmax(130px, 1fr) 2fr auto; align-items: center; gap: 12px; padding: 12px 0; cursor: pointer; list-style: none; }
+.simulation-month summary::-webkit-details-marker { display: none; }
+.simulation-month summary span { color: var(--text); font-weight: 700; font-size: 13px; }
+.simulation-month summary small { color: var(--muted); font-size: 11px; }
+.simulation-month summary b { white-space: nowrap; font-size: 12px; }
+.simulation-month[open] { padding-bottom: 10px; }
+.simulation-history { display: grid; gap: 6px; padding: 0 20px 20px; }
+.simulation-history-row { display: flex; align-items: stretch; gap: 6px; }
+.simulation-history-row > button:first-child { flex: 1; display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px; text-align: left; border: 1px solid var(--border); border-radius: 12px; background: #1c1511; padding: 12px 14px; color: var(--text); cursor: pointer; }
+.simulation-history-row.selected > button:first-child, .simulation-history-row > button:first-child:hover { border-color: #806047; background: #4d33251f; }
+.simulation-history-row span { display: grid; gap: 3px; }
+.simulation-history-row small { color: var(--muted); font-size: 10px; }
+.simulation-delete { width: 34px; border: 1px solid var(--border); border-radius: 12px; background: transparent; color: var(--muted); cursor: pointer; }
+@media (max-width: 680px) {
+  .simulation-equation { grid-template-columns: 1fr; } .simulation-equation > b { display: none; }
+  .simulation-month summary { grid-template-columns: 1fr auto; } .simulation-month summary small { grid-column: 1 / -1; grid-row: 2; }
+  .simulation-history-row > button:first-child { grid-template-columns: 1fr 1fr; }
+}

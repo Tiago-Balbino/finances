@@ -5,12 +5,13 @@ import Bills from './Bills.jsx';
 import Incomes from './Incomes.jsx';
 import Transactions from './Transactions.jsx';
 import Investments from './Investments.jsx';
+import Simulation from './Simulation.jsx';
 import { Empty, Header } from './ui.jsx';
 import AccountDetails from './AccountDetails.jsx';
 import Modal from './Modal.jsx';
 
 const nav = [
-  ['overview', '◫', 'Visão geral'], ['accounts', '▤', 'Contas'], ['cards', '▭', 'Cartões'], ['bills', '◷', 'Despesas'], ['incomes', '↥', 'Entradas'],
+  ['overview', '◫', 'Visão geral'], ['accounts', '▤', 'Contas'], ['cards', '▭', 'Cartões'], ['bills', '◷', 'Despesas'], ['incomes', '↥', 'Entradas'], ['simulation', '⧗', 'Simulação'],
   ['transactions', '⇄', 'Lançamentos'], ['categories', '▦', 'Categorias'], ['yieldRates', '％', 'Taxas'],
   ['investments', '◈', 'Investimentos'], ['users', '♙', 'Pessoas'], ['profile', '⚙', 'Perfil']
 ];
@@ -166,6 +167,7 @@ export default function App() {
   if (view === 'bills') page = <Bills {...pageProps} />;
   if (view === 'incomes') page = <Incomes {...pageProps} />;
   if (view === 'transactions') page = <Transactions {...pageProps} />;
+  if (view === 'simulation') page = <Simulation setMessage={setMessage} />;
   if (view === 'categories') {
     const list = data.categories.filter(item => item.kind === categoryKind);
     page = <><Header title="Categorias" subtitle="Crie grupos e subgrupos para organizar receitas e despesas." action="Nova categoria" onAction={() => open('category', null, { kind: categoryKind })} /><div className="filter-row page-filters"><button className={`filter ${categoryKind === 'expense' ? 'active' : ''}`} onClick={() => setCategoryKind('expense')}>Despesas</button><button className={`filter ${categoryKind === 'income' ? 'active' : ''}`} onClick={() => setCategoryKind('income')}>Entradas</button></div><div className="category-grid">{list.map(item => <article className="category-card" key={item.id}><div className="category-card-head"><div><small>{categoryKind === 'expense' ? 'DESPESA' : 'ENTRADA'}</small><h3>{item.name}</h3></div><div><button className="button tiny ghost" onClick={() => open('category', item)}>Renomear</button><button className="button tiny ghost" onClick={() => remove(`/api/categories/${item.id}`)}>Excluir</button></div></div><div className="subcategory-list">{data.subcategories.filter(sub => sub.category_id === item.id).map(sub => <div key={sub.id}><span>{sub.name}</span><button onClick={() => open('subcategory', sub)} aria-label={`Renomear ${sub.name}`}>Editar</button><button onClick={() => remove(`/api/subcategories/${sub.id}`)} aria-label={`Excluir ${sub.name}`}>×</button></div>)}</div><button className="category-add" onClick={() => open('subcategory', null, { categoryId: item.id })}>＋ Adicionar subcategoria</button></article>)}</div>{!list.length && <div className="panel"><Empty>Nenhuma categoria cadastrada.</Empty></div>}</>;
