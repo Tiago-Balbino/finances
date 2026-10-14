@@ -1,6 +1,8 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import { api, brl, cents, day, decimal, periodName, rate, statusName } from './lib.js';
-import { DueChart, LineChart, SpendingChart } from './Charts.jsx';
+import { LineChart } from './Charts.jsx';
+import Dashboard from './Dashboard.jsx';
+import AccountDetails from './AccountDetails.jsx';
 import Modal from './Modal.jsx';
 
 const nav = [
@@ -43,6 +45,7 @@ export default function App() {
   const [loading, setLoading] = useState(true);
   const [connectionError, setConnectionError] = useState('');
   const [view, setView] = useState('overview');
+  const [selectedAccountId, setSelectedAccountId] = useState(null);
   const [modal, setModal] = useState(null);
   const [message, setMessage] = useState('');
   const [chartRange, setChartRange] = useState(12);
@@ -117,28 +120,14 @@ export default function App() {
   if (connectionError) return <div className="connection-screen"><div className="eyebrow">CONEXÃO INDISPONÍVEL</div><h1>Vamos reconectar.</h1><p>{connectionError}</p><button className="button" onClick={boot}>Tentar novamente →</button></div>;
   if (!data) return <Auth setup={setup} onSuccess={refresh} />;
 
-  const monthlyTransactions = data.transactions.filter(item => item.date.startsWith(data.today.slice(0, 7)) && item.date <= data.today);
-  const income = data.monthly_totals?.income_cents || 0;
-  const expense = data.monthly_spending.reduce((sum, item) => sum + item.amount_cents, 0);
-  const balance = data.accounts.reduce((sum, item) => sum + item.balance_cents, 0);
-  const invested = data.investments.reduce((sum, item) => sum + (item.current_cents || 0), 0);
   const openBills = data.bills.filter(item => item.status !== 'paid');
   const debt = openBills.reduce((sum, item) => sum + (item.current_cents || 0), 0);
   const overdue = data.bills.filter(item => item.status === 'overdue');
   const categoryOptions = data.categories.filter(item => item.kind === 'expense');
 
   let page;
-  if (view === 'overview') page = <>
-    <Header title="Visão geral" subtitle="Seu dinheiro em movimento, hoje e nos próximos meses." />
-    <section className="stats four"><div className="stat featured"><div className="stat-top"><span className="stat-label">Saldo em contas</span><span className="stat-symbol">↗</span></div><div className="stat-value">{brl(balance)}</div><div className="stat-foot">Disponível em {data.accounts.length} contas</div></div>
-      <div className="stat"><div className="stat-top"><span className="stat-label">Investido hoje</span><span className="stat-symbol copper">◈</span></div><div className="stat-value">{brl(invested)}</div><div className="stat-foot">Projeção atualizada diariamente</div></div>
-      <div className="stat"><div className="stat-top"><span className="stat-label">Contas a pagar</span><span className="stat-symbol rose">◷</span></div><div className="stat-value">{brl(debt)}</div><div className="stat-foot">{openBills.length} em aberto · {overdue.length} vencidas</div></div>
-      <div className="stat"><div className="stat-top"><span className="stat-label">Balanço do mês</span><span className="stat-symbol">⇄</span></div><div className={`stat-value ${income - expense < 0 ? 'amount-minus' : 'amount-plus'}`}>{brl(income - expense)}</div><div className="stat-foot">{brl(income)} entradas · {brl(expense)} saídas</div></div></section>
-    <div className="grid-two charts-grid"><section className="panel chart-panel spending-panel"><div className="panel-header"><div><div className="eyebrow">GASTOS REAIS · MÊS ATUAL</div><h2>Para onde foi o dinheiro?</h2><p>Clique em uma categoria para ver subcategorias e pagamentos.</p></div><span className="pill">{brl(expense)}</span></div><SpendingChart rows={data.monthly_spending} transactions={monthlyTransactions} /></section>
-      <section className="panel chart-panel"><div className="panel-header"><div><div className="eyebrow">PLANEJAMENTO</div><h2>Contas a pagar por mês</h2><p>Inclui pendências de meses anteriores.</p></div><button className="link-button" onClick={() => setView('bills')}>Ver despesas →</button></div><DueChart series={data.due_series} /><div className="chart-caption">Despesas não pagas continuam nos meses seguintes.</div></section></div>
-    <div className="grid-two"><section className="panel chart-panel"><div className="panel-header"><div><div className="eyebrow">PROJEÇÃO</div><h2>Investimentos</h2><p>Juros compostos ao longo do tempo</p></div><RangeButtons value={chartRange} onChange={setChartRange} /></div><LineChart series={data.investment_series.slice(0, chartRange + 1)} title="Projeção de investimentos" /></section>
-      <section className="panel"><div className="panel-header"><div><h2>Despesas em atenção</h2><p>Vencidas e próximas do prazo</p></div><button className="link-button" onClick={() => setView('bills')}>Ver todas →</button></div>{openBills.length ? <div className="attention-list">{[...openBills].sort((a, b) => a.due_date.localeCompare(b.due_date)).slice(0, 5).map(item => <button className="attention-row" key={item.id} onClick={() => setView('bills')}><span className={`attention-dot ${item.status}`} /><span><strong>{item.description}</strong><small>{item.category} · {item.status === 'overdue' ? `${item.days_overdue} dias de atraso` : `Vence ${day(item.due_date)}`}</small></span><b>{brl(item.current_cents)}</b></button>)}</div> : <Empty>Nenhuma despesa em aberto.</Empty>}</section></div>
-  </>;
+  if (view === 'overview') page = <Dashboard data={data} onAccount={id => { setSelectedAccountId(id); setView('accountDetail'); }} onView={setView} />;
+  if (view === 'accountDetail') page = <AccountDetails accountId={selectedAccountId} data={data} onBack={() => setView('accounts')} onEdit={item => open('account', item)} onView={setView} />;
   if (view === 'accounts') page = <>
     <Header title="Contas" subtitle="Acompanhe saldos e configure rendimentos passivos." action="Nova conta" onAction={() => open('account')} />
     <div className="cards">{data.accounts.map(item => <article className="item-card" key={item.id}>
@@ -147,7 +136,7 @@ export default function App() {
       <small>Saldo atual</small><div className="big-value">{brl(item.balance_cents)}</div><div className="divider" />
       <div className="flex"><span>Saldo inicial</span><b>{brl(item.opening_cents)}</b></div>
       {item.yield_rate_id && <div className="flex"><span>Rendimento</span><b>{decimal(item.yield_multiplier_basis_points)}% de {item.yield_rate_name} · {decimal(Math.round(item.yield_annual_basis_points * item.yield_multiplier_basis_points / 10000))}% a.a.</b></div>}
-      <div className="item-actions"><button className="button tiny secondary" onClick={() => open('account', item)}>Editar</button><button className="button tiny ghost" onClick={() => remove(`/api/accounts/${item.id}`)}>Excluir</button></div>
+      <div className="item-actions"><button className="button tiny" onClick={() => { setSelectedAccountId(item.id); setView('accountDetail'); }}>Ver detalhes</button><button className="button tiny secondary" onClick={() => open('account', item)}>Editar</button><button className="button tiny ghost" onClick={() => remove(`/api/accounts/${item.id}`)}>Excluir</button></div>
     </article>)}</div>
     {!data.accounts.length && <div className="panel"><Empty>Cadastre a primeira conta.</Empty></div>}
     <p className="muted">Configure as taxas de referência na aba <button className="link-button" onClick={() => setView('yieldRates')}>Taxas →</button></p>
@@ -211,7 +200,7 @@ export default function App() {
   if (view === 'users') page = <><Header title="Pessoas" subtitle="Todos os usuários ativos acessam as mesmas informações." action="Nova pessoa" onAction={() => open('user')} /><section className="panel"><div className="panel-header"><div><h2>Acessos do grupo</h2><p>Somente o administrador gerencia pessoas</p></div></div><div className="table-wrap"><table><thead><tr><th>Nome</th><th>Email</th><th>Perfil</th><th>Estado</th><th /></tr></thead><tbody>{data.users.map(item => <tr key={item.id}><td><strong>{item.name}</strong></td><td className="muted">{item.email}</td><td>{item.role === 'admin' ? 'Administrador' : 'Membro'}</td><td><span className="pill">{item.active ? 'Ativo' : 'Inativo'}</span></td><td>{item.role === 'member' && <div className="table-actions"><button className="button tiny ghost" onClick={() => open('resetUser', item)}>Nova senha</button><button className="button tiny ghost" onClick={() => change(`/api/users/${item.id}`, 'PATCH', { active: !item.active }).catch(error => setMessage(error.message))}>{item.active ? 'Desativar' : 'Ativar'}</button></div>}</td></tr>)}</tbody></table></div></section></>;
   if (view === 'profile') page = <><Header title="Seu perfil" subtitle="Gerencie a segurança do seu acesso." /><section className="panel profile-panel"><div className="panel-header"><div><h2>Seus dados</h2><p>{data.user.email}</p></div></div><div className="profile-detail"><div className="flex"><span>Nome</span><b>{data.user.name}</b></div><div className="flex"><span>Perfil</span><b>{data.user.role === 'admin' ? 'Administrador' : 'Membro'}</b></div><button className="button secondary" onClick={() => open('password')}>Trocar senha</button></div></section></>;
 
-  return <div className="app-shell"><aside className="sidebar"><div className="brand"><span className="brand-mark">F<span>.</span></span><span>finances<small>ESPAÇO COMPARTILHADO</small></span></div><nav aria-label="Navegação principal">{nav.filter(([key]) => key !== 'users' || data.user.role === 'admin').map(([key, icon, label]) => <button key={key} className={`nav-item ${view === key ? 'active' : ''}`} onClick={() => setView(key)}><span className="nav-icon">{icon}</span>{label}</button>)}</nav><div className="sidebar-bottom"><div className="sidebar-note"><span className="note-dot" />Dados compartilhados com seu grupo</div><button className="logout" onClick={async () => { try { await api('/api/logout', 'POST'); setData(null); setView('overview'); } catch (error) { setMessage(error.message); } }}>Sair da conta <span>↗</span></button></div></aside><div className="content-wrap"><header className="topbar"><div className="mobile-brand">F<span>.</span> <strong>finances</strong></div><span>{new Intl.DateTimeFormat('pt-BR', { dateStyle: 'full' }).format(new Date(`${data.today}T12:00:00`))}</span><div className="profile"><span className="avatar">{data.user.name.charAt(0).toUpperCase()}</span><span>{data.user.name}</span></div></header><main key={view} className="page-enter">{page}</main></div>{modal && <Modal key={`${modal.type}-${modal.record?.id || 'new'}`} modal={modal} data={data} onClose={() => setModal(null)} onSave={saveModal} />}{message && <div id="toast" className="show" role="status">{message}</div>}</div>;
+  return <div className="app-shell"><aside className="sidebar"><div className="brand"><span className="brand-mark">F<span>.</span></span><span>finances<small>ESPAÇO COMPARTILHADO</small></span></div><nav aria-label="Navegação principal">{nav.filter(([key]) => key !== 'users' || data.user.role === 'admin').map(([key, icon, label]) => <button key={key} className={`nav-item ${view === key || view === 'accountDetail' && key === 'accounts' ? 'active' : ''}`} onClick={() => setView(key)}><span className="nav-icon">{icon}</span>{label}</button>)}</nav><div className="sidebar-bottom"><div className="sidebar-note"><span className="note-dot" />Dados compartilhados com seu grupo</div><button className="logout" onClick={async () => { try { await api('/api/logout', 'POST'); setData(null); setView('overview'); } catch (error) { setMessage(error.message); } }}>Sair da conta <span>↗</span></button></div></aside><div className="content-wrap"><header className="topbar"><div className="mobile-brand">F<span>.</span> <strong>finances</strong></div><span>{new Intl.DateTimeFormat('pt-BR', { dateStyle: 'full' }).format(new Date(`${data.today}T12:00:00`))}</span><div className="profile"><span className="avatar">{data.user.name.charAt(0).toUpperCase()}</span><span>{data.user.name}</span></div></header><main key={view} className="page-enter">{page}</main></div>{modal && <Modal key={`${modal.type}-${modal.record?.id || 'new'}`} modal={modal} data={data} onClose={() => setModal(null)} onSave={saveModal} />}{message && <div id="toast" className="show" role="status">{message}</div>}</div>;
 }
 
 function RangeButtons({ value, onChange }) { return <div className="segmented"><button className={value === 6 ? 'selected' : ''} onClick={() => onChange(6)}>6 meses</button><button className={value === 12 ? 'selected' : ''} onClick={() => onChange(12)}>12 meses</button></div>; }
