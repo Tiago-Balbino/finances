@@ -13,6 +13,14 @@ export function methodLabel(item) {
   if (item.card_purchase_id) return `Crédito · ${item.card_name}${item.installments > 1 ? ` · ${item.installments}x` : ''}`;
   return methodName[item.payment_method] || '';
 }
+export const monthTitle = value => new Intl.DateTimeFormat('pt-BR', { month: 'long', year: 'numeric' })
+  .format(new Date(`${value}-01T12:00:00`)).replace(/^./, letter => letter.toUpperCase());
+export const moveMonth = (value, offset) => {
+  const [year, month] = value.split('-').map(Number);
+  const next = new Date(Date.UTC(year, month - 1 + offset, 1));
+  return `${next.getUTCFullYear()}-${String(next.getUTCMonth() + 1).padStart(2, '0')}`;
+};
+export const percent = basisPoints => `${(basisPoints / 100).toLocaleString('pt-BR', { maximumFractionDigits: 1 })}%`;
 export const spendableAccounts = data => data.accounts.filter(item => !item.collateral_card_id);
 
 export async function api(path, method = 'GET', body) {

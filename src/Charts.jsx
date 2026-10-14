@@ -59,3 +59,12 @@ export function SpendingChart({ rows = [], transactions = [] }) {
     </div>
   </div>;
 }
+
+export function SourceList({ rows, empty = 'As entradas recebidas neste mês aparecerão aqui.', unit = 'das entradas' }) {
+  const grouped = new Map();
+  for (const row of rows) grouped.set(row.category, (grouped.get(row.category) || 0) + row.amount_cents);
+  const ordered = [...grouped].sort((a, b) => b[1] - a[1]);
+  const total = ordered.reduce((sum, [, amount]) => sum + amount, 0);
+  if (!ordered.length) return <div className="chart-empty"><span>◌</span>{empty}</div>;
+  return <div className="source-list">{ordered.map(([name, amount]) => <div className="source-item" key={name}><div><strong>{name}</strong><b>{brl(amount)}</b></div><span className="source-track"><span style={{ width: `${amount / total * 100}%` }} /></span><small>{Math.round(amount / total * 100)}% {unit}</small></div>)}</div>;
+}

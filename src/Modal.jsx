@@ -74,13 +74,14 @@ export default function Modal({ modal, data, onClose, onSave }) {
   const [rateSource, setRateSource] = useState(record.source_code || 'manual');
   const title = ({ account: record.id ? 'Editar conta' : 'Nova conta', bill: record.id ? 'Editar despesa' : 'Nova despesa',
     income: record.id ? 'Editar entrada' : 'Nova entrada', receipt: 'Registrar recebimento',
-    transaction: record.id ? 'Editar lançamento' : 'Novo lançamento', investment: 'Novo investimento',
+    transaction: record.id ? 'Editar lançamento' : record.kind === 'income' ? 'Nova entrada avulsa' : record.kind === 'expense' ? 'Nova saída' : 'Novo lançamento', investment: record.id ? 'Editar investimento' : 'Novo investimento',
     payment: 'Registrar pagamento', interest: 'Juros e multa', category: record.id ? 'Renomear categoria' : 'Nova categoria',
     subcategory: record.id ? 'Renomear subcategoria' : 'Nova subcategoria', password: 'Trocar senha',
     user: 'Nova pessoa', resetUser: 'Definir nova senha', billNote: 'Editar observações', classification: 'Classificar despesa',
     yieldRate: record.id ? 'Editar taxa de referência' : 'Nova taxa de referência',
     card: record.id ? 'Editar cartão' : 'Novo cartão de crédito',
-    collateral: modal.direction === 'withdraw' ? 'Resgatar limite garantido' : 'Aportar no limite garantido' })[type];
+    collateral: modal.direction === 'withdraw' ? 'Resgatar limite garantido' : 'Aportar no limite garantido',
+    investmentMovement: modal.direction === 'withdraw' ? 'Resgatar do investimento' : 'Aportar no investimento' })[type];
   const accounts = spendableAccounts(data).map(item => [item.id, item.name]);
   const [cardRateId, setCardRateId] = useState(String(record.yield_rate_id || ''));
   const selectedAccount = String(record.account_id || accounts[0]?.[0] || '');
@@ -149,12 +150,25 @@ export default function Modal({ modal, data, onClose, onSave }) {
           {noteField}
         </>}
         {type === 'investment' && <>
-          <Field label="Nome do investimento" name="name" maxLength={120} />
-          <Field label="Tipo" name="type" maxLength={60} placeholder="CDB, Tesouro, Fundo..." />
-          <Field label="Valor inicial (R$)" name="principal" type="number" min="0.01" step="0.01" />
-          <Field label="Taxa (%)" name="rate" type="number" min="-99.99" max="1000" step="0.01" />
-          <Select label="Periodicidade" name="period" value="monthly" options={[["monthly", "Ao mês"], ["yearly", "Ao ano"], ["daily", "Ao dia"]]} />
-          <Field label="Data inicial" name="startDate" type="date" value={data.today} />{noteField}
+          <Field label="Nome do investimento" name="name" value={record.name} maxLength={120} />
+          <Field label="Tipo" name="type" value={record.type} maxLength={60} placeholder="CDB, Tesouro, Fundo..." />
+          <Field label="Taxa (%)" name="rate" type="number" value={record.id ? decimal(record.rate_basis_points) : ''} min="-99.99" max="1000" step="0.01" />
+          <Select label="Periodicidade" name="period" value={record.period || 'monthly'} options={[["monthly", "Ao mês"], ["yearly", "Ao ano"], ["daily", "Ao dia"]]} />
+          {!record.id && <>
+            <Field label="Primeiro aporte (R$)" name="principal" type="number" min="0.01" step="0.01" />
+            <Field label="Data do aporte" name="startDate" type="date" value={data.today} max={data.today} />
+            <Select label="Retirar da conta (opcional)" name="accountId" value="" options={accounts} required={false} />
+            <p className="form-hint wide">Escolhendo uma conta, o valor sai do saldo dela sem contar como gasto. Sem conta, o aporte é só registrado no caixa.</p>
+          </>}
+          {record.id && <p className="form-hint wide">A nova taxa vale para todo o histórico do caixa. Para mudar o valor, use Aportar ou Resgatar.</p>}
+          {noteField}
+        </>}
+        {type === 'investmentMovement' && <>
+          <input type="hidden" name="direction" value={modal.direction} />
+          <p className="form-hint wide">{record.name} vale hoje <b>{brl(record.current_cents)}</b>.{modal.direction === 'withdraw' ? ' O resgate não pode passar desse valor.' : ''}</p>
+          <Select label={modal.direction === 'withdraw' ? 'Devolver para a conta (opcional)' : 'Retirar da conta (opcional)'} name="accountId" value={String(accounts[0]?.[0] || '')} options={accounts} required={false} />
+          <Field label="Valor (R$)" name="amount" type="number" min="0.01" step="0.01" max={modal.direction === 'withdraw' ? decimal(record.current_cents) : undefined} />
+          <Field label="Data" name="date" type="date" value={data.today} max={data.today} />{noteField}
         </>}
         {type === 'yieldRate' && <><Field label="Nome da taxa" name="name" value={record.name} maxLength={80} placeholder="Ex.: CDI" />
           <Select label="Origem do valor" name="sourceCode" value={rateSource} onChange={event => setRateSource(event.target.value)} options={[["manual", "Manual"], ["cdi", "CDI · Banco Central"], ["selic_target", "Selic Meta · Banco Central"]]} />
