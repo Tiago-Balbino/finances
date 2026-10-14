@@ -1,0 +1,37 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#1a1310">
+  <title>Finances — Seu dinheiro em perspectiva</title>
+  <meta name="description" content="Contas, lançamentos e investimentos compartilhados em um só lugar.">
+  <link rel="stylesheet" href="/style.css">
+  <link rel="stylesheet" href="/theme.css">
+  <script src="/app.js" defer></script>
+</head>
+<body>
+  <div id="auth" class="auth-shell" hidden></div>
+  <div id="app" class="app-shell" hidden>
+    <aside class="sidebar">
+      <div class="brand"><span class="brand-mark">F<span>.</span></span><span>finances<small>ESPAÇO COMPARTILHADO</small></span></div>
+      <nav aria-label="Navegação principal" id="nav">
+        <button class="nav-item active" data-view="overview"><span class="nav-icon">◫</span> Visão geral</button>
+        <button class="nav-item" data-view="accounts"><span class="nav-icon">▤</span> Contas</button>
+        <button class="nav-item" data-view="bills"><span class="nav-icon">◷</span> Despesas</button>
+        <button class="nav-item" data-view="transactions"><span class="nav-icon">⇄</span> Lançamentos</button>
+        <button class="nav-item" data-view="investments"><span class="nav-icon">◈</span> Investimentos</button>
+        <button class="nav-item" data-view="users" id="users-nav" hidden><span class="nav-icon">♙</span> Pessoas</button>
+        <button class="nav-item" data-view="profile"><span class="nav-icon">⚙</span> Perfil</button>
+      </nav>
+      <div class="sidebar-bottom"><div class="sidebar-note"><span class="note-dot"></span> Dados compartilhados com seu grupo</div><button id="logout" class="logout">Sair da conta <span>↗</span></button></div>
+    </aside>
+    <div class="content-wrap">
+      <header class="topbar"><div class="mobile-brand">F<span>.</span> <strong>finances</strong></div><span id="today-label"></span><div class="profile"><span class="avatar" id="avatar"></span><span id="user-label"></span></div></header>
+      <main id="content"></main>
+    </div>
+  </div>
+  <dialog id="modal"><div id="modal-body"></div></dialog>
+  <div id="toast" role="status" aria-live="polite"></div>
+</body>
+</html>
