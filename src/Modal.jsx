@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { brl, decimal, spendableAccounts } from './lib.js';
+import { brl, day, decimal, spendableAccounts } from './lib.js';
 
 function Field({ label, name, value = '', type = 'text', required = true, wide = false, ...props }) {
   return <div className={wide ? 'wide' : ''}><label htmlFor={`f-${name}`}>{label}</label>{type === 'textarea'
@@ -43,7 +43,7 @@ function PenaltyFields({ record }) {
   </>;
 }
 
-function PaymentFields({ data, accountLabel, initialAccount, initialMethod, initialCard, allowCredit = true, planned = false }) {
+function PaymentFields({ data, accountLabel, initialAccount, initialMethod, initialCard, initialInstallments, allowCredit = true, planned = false }) {
   const accounts = spendableAccounts(data);
   const [accountId, setAccountId] = useState(String(initialAccount || accounts[0]?.id || ''));
   const [method, setMethod] = useState(initialMethod || 'pix');
@@ -55,7 +55,7 @@ function PaymentFields({ data, accountLabel, initialAccount, initialMethod, init
     <Select label={planned ? 'Forma de pagamento prevista' : 'Forma de pagamento'} name="paymentMethod" value={current} onChange={event => setMethod(event.target.value)} options={[['pix', 'Pix'], ['debit', 'Débito'], ...(creditAvailable ? [['credit', 'Crédito']] : [])]} />
     {!planned && current === 'credit' && <>
       <Select key={accountId} label="Cartão" name="creditCardId" value={String((cards.find(card => card.id === initialCard) || cards[0])?.id || '')} options={cards.map(card => [card.id, `${card.name} · disponível ${brl(card.available_cents)}`])} />
-      <Select label="Parcelas" name="installments" value="1" options={Array.from({ length: 24 }, (_, index) => [index + 1, index ? `${index + 1}x` : 'À vista'])} />
+      <Select label="Parcelas" name="installments" value={String(initialInstallments || 1)} options={Array.from({ length: 24 }, (_, index) => [index + 1, index ? `${index + 1}x` : 'À vista'])} />
       <p className="form-hint wide">A compra consome o limite do cartão e entra nas próximas faturas. O saldo da conta só muda quando a fatura for paga.</p>
     </>}
     {allowCredit && !planned && !cards.length && <p className="form-hint wide">Para pagar no crédito, cadastre um cartão nesta conta na aba Cartões.</p>}
@@ -73,9 +73,9 @@ export default function Modal({ modal, data, onClose, onSave }) {
   const [yieldRateId, setYieldRateId] = useState(String(record.yield_rate_id || ''));
   const [rateSource, setRateSource] = useState(record.source_code || 'manual');
   const title = ({ account: record.id ? 'Editar conta' : 'Nova conta', bill: record.id ? 'Editar despesa' : 'Nova despesa',
-    income: record.id ? 'Editar entrada' : 'Nova entrada', receipt: 'Registrar recebimento',
-    transaction: record.id ? 'Editar lançamento' : record.kind === 'income' ? 'Nova entrada avulsa' : record.kind === 'expense' ? 'Nova saída' : 'Novo lançamento', investment: record.id ? 'Editar investimento' : 'Novo investimento',
-    payment: 'Registrar pagamento', interest: 'Juros e multa', category: record.id ? 'Renomear categoria' : 'Nova categoria',
+    income: record.id ? 'Editar entrada' : 'Nova entrada', receipt: modal.receipt ? 'Editar recebimento' : 'Registrar recebimento',
+    transaction: record.card_purchase_id ? 'Editar compra no cartão' : record.id ? 'Editar lançamento' : record.kind === 'income' ? 'Nova entrada avulsa' : record.kind === 'expense' ? 'Nova saída' : 'Novo lançamento', investment: record.id ? 'Editar investimento' : 'Novo investimento',
+    payment: modal.payment ? 'Editar pagamento' : 'Registrar pagamento', interest: 'Juros e multa', category: record.id ? 'Renomear categoria' : 'Nova categoria',
     subcategory: record.id ? 'Renomear subcategoria' : 'Nova subcategoria', password: 'Trocar senha',
     user: 'Nova pessoa', resetUser: 'Definir nova senha', billNote: 'Editar observações', classification: 'Classificar despesa',
     yieldRate: record.id ? 'Editar taxa de referência' : 'Nova taxa de referência',
@@ -128,25 +128,28 @@ export default function Modal({ modal, data, onClose, onSave }) {
           <CategoryFields data={data} kind="income" initialCategory={record.category_id} initialSubcategory={record.subcategory_id} />
           <Field label="Data prevista" name="dueDate" type="date" value={record.due_date || data.today} />{noteField}
         </>}
-        {type === 'receipt' && <>
+        {type === 'receipt' && (modal.receipt ? <>
+          <p className="form-hint wide">Recebimento de <b>{brl(modal.receipt.amount_cents)}</b> em {day(modal.receipt.date)}. O total recebido não pode passar de {brl(record.amount_cents)}.</p>
+          <Select label="Receber na conta" name="accountId" value={String(modal.receipt.account_id)} options={accounts} />
+          <Field label="Valor recebido (R$)" name="amount" type="number" value={decimal(modal.receipt.amount_cents)} min="0.01" max={decimal(record.remaining_cents + modal.receipt.amount_cents)} step="0.01" />
+          <Field label="Data do recebimento" name="date" type="date" value={modal.receipt.date} max={data.today} />
+          <Field label="Observações (opcional)" name="note" type="textarea" value={modal.receipt.note} required={false} wide />
+        </> : <>
           <p className="form-hint wide">Ainda falta receber <b>{brl(record.remaining_cents)}</b>. Recebimentos parciais são aceitos.</p>
           <Select label="Receber na conta" name="accountId" value={selectedAccount} options={accounts} />
           <Field label="Valor recebido (R$)" name="amount" type="number" value={decimal(record.remaining_cents)} min="0.01" max={decimal(record.remaining_cents)} step="0.01" />
           <Field label="Data do recebimento" name="date" type="date" value={data.today} max={data.today} />{noteField}
-        </>}
+        </>)}
         {type === 'transaction' && <>
-          {record.card_purchase_id
-            ? <><input type="hidden" name="kind" value="expense" /><p className="form-hint wide">Compra no cartão {record.card_name}. Aqui você altera nome, categoria e observações de todas as parcelas. Para mudar valor, data ou parcelas, exclua e lance novamente.</p>
-              <Field label="Nome da compra" name="description" value={modal.purchaseDescription || record.description} maxLength={120} wide />
-              <CategoryFields data={data} kind="expense" initialCategory={record.category_id} initialSubcategory={record.subcategory_id} /></>
-            : <><Select label="Tipo de lançamento" name="kind" value={kind} onChange={event => setKind(event.target.value)} options={[["expense", "Despesa paga"], ["income", "Entrada"]]} />
+          {record.card_purchase_id && <p className="form-hint wide">Compra no cartão {record.card_name}{record.installments > 1 ? ` em ${record.installments}x` : ''}. Ao mudar valor, data, parcelas ou cartão, as parcelas são refeitas nas faturas.</p>}
+          <>{record.card_purchase_id ? <input type="hidden" name="kind" value="expense" /> : <Select label="Tipo de lançamento" name="kind" value={kind} onChange={event => setKind(event.target.value)} options={[["expense", "Despesa paga"], ["income", "Entrada"]]} />}
               {kind === 'expense'
-                ? <PaymentFields key="payment-expense" data={data} accountLabel="Conta" initialAccount={record.account_id} initialMethod={record.payment_method} initialCard={record.credit_card_id} allowCredit={!record.id} />
+                ? <PaymentFields key="payment-expense" data={data} accountLabel="Conta" initialAccount={record.account_id} initialMethod={record.payment_method} initialCard={record.credit_card_id} initialInstallments={record.installments} />
                 : <Select label="Conta" name="accountId" value={selectedAccount} options={accounts} />}
               <Field label="Nome do lançamento" name="description" value={record.description} maxLength={120} wide />
               <CategoryFields key={kind} data={data} kind={kind} initialCategory={record.kind === kind ? record.category_id : null} initialSubcategory={record.kind === kind ? record.subcategory_id : null} />
               <Field label="Valor (R$)" name="amount" type="number" value={record.id ? decimal(record.amount_cents) : ''} min="0.01" step="0.01" />
-              <Field label="Data" name="date" type="date" value={record.date || data.today} max={data.today} /></>}
+              <Field label="Data" name="date" type="date" value={record.date || data.today} max={data.today} /></>
           {noteField}
         </>}
         {type === 'investment' && <>
@@ -174,12 +177,18 @@ export default function Modal({ modal, data, onClose, onSave }) {
           <Select label="Origem do valor" name="sourceCode" value={rateSource} onChange={event => setRateSource(event.target.value)} options={[["manual", "Manual"], ["cdi", "CDI · Banco Central"], ["selic_target", "Selic Meta · Banco Central"]]} />
           {rateSource === 'manual' && <Field label="Valor da taxa (% ao ano)" name="annualRate" type="number" value={record.id ? decimal(record.annual_basis_points) : ''} min="0" max="100" step="0.01" />}
           <p className="form-hint wide">{rateSource === 'manual' ? 'Você define o valor anual. Cada conta escolhe esta taxa e um percentual dela.' : 'O valor anual será consultado no Banco Central. A conta pode render, por exemplo, 105% desta taxa.'}</p></>}
-        {type === 'payment' && <>
+        {type === 'payment' && (modal.payment ? <>
+          <p className="form-hint wide">Pagamento de <b>{brl(modal.payment.amount_cents)}</b> em {day(modal.payment.date)} da despesa {record.description}. Ao salvar, ele é substituído pelos dados abaixo.</p>
+          <PaymentFields data={data} accountLabel="Pagar pela conta" initialAccount={modal.payment.account_id} initialMethod={modal.payment.payment_method || 'pix'} initialCard={modal.payment.credit_card_id} initialInstallments={modal.payment.installments} allowCredit={!record.credit_card_id} />
+          <Field label="Valor pago (R$)" name="amount" type="number" value={decimal(modal.payment.amount_cents)} min="0.01" step="0.01" />
+          <Field label="Data do pagamento" name="date" type="date" value={modal.payment.date} max={data.today} />
+          <Field label="Observações (opcional)" name="note" type="textarea" value={modal.payment.note} required={false} wide />
+        </> : <>
           <p className="form-hint wide">Saldo atualizado de <b>{brl(record.current_cents)}</b>. Pagamentos parciais são aceitos.</p>
           <PaymentFields data={data} accountLabel="Pagar pela conta" initialAccount={record.account_id} initialMethod={record.credit_card_id ? 'pix' : record.payment_method} allowCredit={!record.credit_card_id} />
           <Field label="Valor pago (R$)" name="amount" type="number" value={decimal(record.current_cents)} min="0.01" max={decimal(record.current_cents)} step="0.01" />
           <Field label="Data do pagamento" name="date" type="date" value={data.today} max={data.today} />{noteField}
-        </>}
+        </>)}
         {type === 'interest' && <>
           <p className="form-hint wide">A nova taxa será aplicada desde o vencimento desta despesa.</p>
           <PenaltyFields record={record} />
