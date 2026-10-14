@@ -32,8 +32,10 @@ export default function Modal({ modal, data, onClose, onSave }) {
   const [kind, setKind] = useState(record.kind || 'expense');
   const [interestPeriod, setInterestPeriod] = useState(record.interest_period || 'monthly');
   const [expenseType, setExpenseType] = useState(record.expense_type || 'eventual');
+  const [incomeType, setIncomeType] = useState(record.income_type || 'eventual');
   const [yieldRateId, setYieldRateId] = useState(String(record.yield_rate_id || ''));
   const title = ({ account: record.id ? 'Editar conta' : 'Nova conta', bill: record.id ? 'Editar despesa' : 'Nova despesa',
+    income: record.id ? 'Editar entrada' : 'Nova entrada', receipt: 'Registrar recebimento',
     transaction: record.id ? 'Editar lançamento' : 'Novo lançamento', investment: 'Novo investimento',
     payment: 'Registrar pagamento', interest: 'Juros da despesa', category: record.id ? 'Renomear categoria' : 'Nova categoria',
     subcategory: record.id ? 'Renomear subcategoria' : 'Nova subcategoria', password: 'Trocar senha',
@@ -73,6 +75,23 @@ export default function Modal({ modal, data, onClose, onSave }) {
           <Field label="Juros após vencimento (%)" name="interestRate" type="number" value={decimal(record.interest_rate_basis_points)} min="0" max={interestPeriod === 'daily' ? '10' : '100'} step="0.01" />
           <Select label="Período dos juros" name="interestPeriod" value={interestPeriod} onChange={event => setInterestPeriod(event.target.value)} options={[["monthly", "Ao mês"], ["daily", "Ao dia"]]} />
           {noteField}
+        </>}
+        {type === 'income' && <>
+          <Field label="Nome da entrada" name="description" value={record.description} maxLength={120} wide />
+          {record.recurrence_origin_id
+            ? <><input type="hidden" name="incomeType" value="fixed" /><p className="form-hint wide">Entrada fixa deste mês. Edite esta parcela separadamente.</p></>
+            : <><Select label="Tipo de entrada" name="incomeType" value={incomeType} onChange={event => setIncomeType(event.target.value)} options={[["eventual", "Eventual"], ["fixed", "Fixa"]]} />
+              <p className="form-hint wide">{incomeType === 'fixed' ? 'Repete todo mês no mesmo dia. Cada salário pode ser recebido separadamente.' : 'Acontece uma única vez.'}</p></>}
+          <Select label="Conta prevista" name="accountId" value={selectedAccount} options={accounts} />
+          <Field label="Valor previsto (R$)" name="amount" type="number" value={record.id ? decimal(record.amount_cents) : ''} min="0.01" step="0.01" />
+          <CategoryFields data={data} kind="income" initialCategory={record.category_id} initialSubcategory={record.subcategory_id} />
+          <Field label="Data prevista" name="dueDate" type="date" value={record.due_date || data.today} />{noteField}
+        </>}
+        {type === 'receipt' && <>
+          <p className="form-hint wide">Ainda falta receber <b>{brl(record.remaining_cents)}</b>. Recebimentos parciais são aceitos.</p>
+          <Select label="Receber na conta" name="accountId" value={selectedAccount} options={accounts} />
+          <Field label="Valor recebido (R$)" name="amount" type="number" value={decimal(record.remaining_cents)} min="0.01" max={decimal(record.remaining_cents)} step="0.01" />
+          <Field label="Data do recebimento" name="date" type="date" value={data.today} max={data.today} />{noteField}
         </>}
         {type === 'transaction' && <>
           <Select label="Tipo de lançamento" name="kind" value={kind} onChange={event => setKind(event.target.value)} options={[["expense", "Despesa paga"], ["income", "Entrada"]]} />

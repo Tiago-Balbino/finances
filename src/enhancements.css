@@ -46,6 +46,10 @@ button:focus-visible, a:focus-visible, .chart-point:focus-visible { outline: 2px
 .row-note, .sub-label { display: block; margin-top: 5px; color: var(--muted); font-size: 10px; white-space: normal; max-width: 280px; line-height: 1.4; }
 .card-note { color: #c5aa94; font-size: 11px; line-height: 1.6; margin: 9px 0 14px; white-space: pre-wrap; }
 .bill-card .card-note { border-left: 2px solid #94694c; padding-left: 10px; }
+.income-card.received { opacity: .82; }
+.income-card .bill-amount strong { color: #bdd8ad; }
+.income-card.overdue .bill-amount strong { color: #f0a694; }
+.status-pill.received { background: #34443a; color: #b3d0aa; }
 .table-actions { display: flex; gap: 3px; }
 .page-filters { margin: -10px 0 18px; }
 .inline-filter { display: flex; align-items: center; gap: 12px; margin: 0 0 18px; }
