@@ -31,6 +31,7 @@ export default function Modal({ modal, data, onClose, onSave }) {
   const type = modal.type;
   const [kind, setKind] = useState(record.kind || 'expense');
   const [interestPeriod, setInterestPeriod] = useState(record.interest_period || 'monthly');
+  const [expenseType, setExpenseType] = useState(record.expense_type || 'eventual');
   const title = ({ account: record.id ? 'Editar conta' : 'Nova conta', bill: record.id ? 'Editar despesa' : 'Nova despesa',
     transaction: record.id ? 'Editar lançamento' : 'Novo lançamento', investment: 'Novo investimento',
     payment: 'Registrar pagamento', interest: 'Juros da despesa', category: record.id ? 'Renomear categoria' : 'Nova categoria',
@@ -56,6 +57,10 @@ export default function Modal({ modal, data, onClose, onSave }) {
         </>}
         {type === 'bill' && <>
           <Field label="Nome da despesa" name="description" value={record.description} maxLength={120} wide />
+          {record.recurrence_origin_id
+            ? <><input type="hidden" name="expenseType" value="fixed" /><p className="form-hint wide">Despesa fixa deste mês. Edite o valor e o vencimento desta parcela aqui.</p></>
+            : <><Select label="Tipo de despesa" name="expenseType" value={expenseType} onChange={event => setExpenseType(event.target.value)} options={[["eventual", "Eventual"], ["fixed", "Fixa"]]} />
+              <p className="form-hint wide">{expenseType === 'fixed' ? 'A despesa fixa se repete todo mês no mesmo dia do vencimento. Cada mês pode ser pago separadamente.' : 'A despesa eventual acontece somente uma vez, como gasolina ou um lanche.'}</p></>}
           <Select label="Conta prevista" name="accountId" value={selectedAccount} options={accounts} />
           <Field label="Valor original (R$)" name="amount" type="number" value={record.id ? decimal(record.amount_cents) : ''} min="0.01" step="0.01" />
           <CategoryFields data={data} kind="expense" initialCategory={record.category_id} initialSubcategory={record.subcategory_id} />
