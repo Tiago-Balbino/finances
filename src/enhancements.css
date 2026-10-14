@@ -230,3 +230,15 @@ button:focus-visible, a:focus-visible, .chart-point:focus-visible { outline: 2px
 .hidden-scroll .table-wrap { overflow: visible; }
 .hidden-scroll::-webkit-scrollbar { display: none; }
 .hidden-scroll thead th { position: sticky; top: 0; z-index: 1; }
+/* Installed app (PWA): keep content clear of the notch, status bar and gesture bar. */
+@media (max-width: 680px) {
+  .topbar { height: calc(60px + env(safe-area-inset-top)); padding-top: env(safe-area-inset-top); }
+  .sidebar { padding-bottom: calc(6px + env(safe-area-inset-bottom)); }
+  main { padding-bottom: calc(100px + env(safe-area-inset-bottom)); }
+  .auth-art { padding-top: calc(28px + env(safe-area-inset-top)); }
+  #toast { bottom: calc(84px + env(safe-area-inset-bottom)); }
+}
+@media (display-mode: standalone) {
+  html, body { overscroll-behavior-y: none; }
+  button, a { -webkit-tap-highlight-color: transparent; }
+}
