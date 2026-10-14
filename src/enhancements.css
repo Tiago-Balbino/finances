@@ -218,3 +218,15 @@ button:focus-visible, a:focus-visible, .chart-point:focus-visible { outline: 2px
 .chart-empty .link-button { margin-top: 8px; }
 .bill-card .carry-pill { width: max-content; margin: 2px 0 6px; }
 @media (max-width: 680px) { .toolbar-side { width: 100%; justify-content: space-between; } .page-actions { width: 100%; } .page-actions .button { flex: 1; } }
+.category-strip { padding: 0 24px 22px; }
+.strip-bar { display: flex; height: 16px; border-radius: 10px; overflow: hidden; gap: 2px; background: #3b2c24; }
+.strip-bar > span { min-width: 4px; transform-origin: left; animation: barGrow .75s cubic-bezier(.2,.8,.2,1) both; }
+.strip-legend { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 14px; }
+.strip-chip { display: inline-flex; align-items: center; gap: 6px; padding: 6px 10px; border: 1px solid var(--border); border-radius: 100px; background: #1c1511; color: var(--muted); font-size: 11px; }
+.strip-chip i { width: 9px; height: 9px; border-radius: 50%; }
+.strip-chip b { color: var(--text); }
+.direct-expenses { width: 100%; }
+.hidden-scroll { max-height: 380px; overflow: auto; scrollbar-width: none; -ms-overflow-style: none; }
+.hidden-scroll .table-wrap { overflow: visible; }
+.hidden-scroll::-webkit-scrollbar { display: none; }
+.hidden-scroll thead th { position: sticky; top: 0; z-index: 1; }

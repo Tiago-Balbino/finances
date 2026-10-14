@@ -68,3 +68,20 @@ export function SourceList({ rows, empty = 'As entradas recebidas neste mês apa
   if (!ordered.length) return <div className="chart-empty"><span>◌</span>{empty}</div>;
   return <div className="source-list">{ordered.map(([name, amount]) => <div className="source-item" key={name}><div><strong>{name}</strong><b>{brl(amount)}</b></div><span className="source-track"><span style={{ width: `${amount / total * 100}%` }} /></span><small>{Math.round(amount / total * 100)}% {unit}</small></div>)}</div>;
 }
+
+const stripColors = ['#e2a57a', '#a8cb9b', '#9cb8c9', '#d98f7e', '#c9b27a', '#b39ccc', '#7fb5a6', '#8c7466'];
+
+// One horizontal bar split by category, with the legend as chips. Small categories beyond the 7th become "Outras".
+export function CategoryStrip({ rows, empty = 'As despesas do mês aparecerão aqui.' }) {
+  const grouped = new Map();
+  for (const row of rows) grouped.set(row.category, (grouped.get(row.category) || 0) + row.amount_cents);
+  let ordered = [...grouped].filter(([, amount]) => amount > 0).sort((a, b) => b[1] - a[1]);
+  if (ordered.length > 8) ordered = [...ordered.slice(0, 7), ['Outras', ordered.slice(7).reduce((sum, [, amount]) => sum + amount, 0)]];
+  const total = ordered.reduce((sum, [, amount]) => sum + amount, 0);
+  if (!total) return <div className="chart-empty"><span>◌</span>{empty}</div>;
+  const share = amount => `${Math.round(amount / total * 100)}%`;
+  return <div className="category-strip">
+    <div className="strip-bar" role="img" aria-label={ordered.map(([name, amount]) => `${name}: ${brl(amount)} (${share(amount)})`).join(', ')}>{ordered.map(([name, amount], index) => <span key={name} title={`${name}: ${brl(amount)} · ${share(amount)}`} style={{ flexGrow: amount, background: stripColors[index % stripColors.length] }} />)}</div>
+    <div className="strip-legend">{ordered.map(([name, amount], index) => <span className="strip-chip" key={name}><i style={{ background: stripColors[index % stripColors.length] }} /><b>{name}</b>{brl(amount)} · {share(amount)}</span>)}</div>
+  </div>;
+}

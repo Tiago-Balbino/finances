@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { LineChart } from './Charts.jsx';
+import { CategoryStrip, LineChart } from './Charts.jsx';
 import MonthPicker, { useApi } from './MonthPicker.jsx';
 import { brl, day, decimal, methodName, monthName, moveMonth, percent, periodName, statusName } from './lib.js';
 import { Empty, Header, Progress, RangeButtons, Stat, TransactionTable } from './ui.jsx';
@@ -45,6 +45,11 @@ export default function Bills({ data, open, remove, change, setMessage }) {
     && (method === 'all' || (item.credit_card_id ? 'credit' : item.payment_method) === method));
   const toPay = entries.filter(({ entry }) => entry.value_cents > 0);
   const directRows = (direct?.items || []).filter(item => item.kind === 'expense' && (method === 'all' || item.payment_method === method));
+  // Month spending by category: bills due this month (invoices excluded, their purchases are already
+  // among the direct expenses) plus day-to-day expenses.
+  const byCategory = [
+    ...entries.filter(({ entry, item }) => !entry.carried && !item.credit_card_id).map(({ item }) => ({ category: item.category, amount_cents: item.amount_cents })),
+    ...(direct?.items || []).filter(item => item.kind === 'expense').map(item => ({ category: item.category, amount_cents: item.amount_cents }))];
   const monthTotal = report ? report.fixed.total_cents + report.eventual.total_cents + report.invoice.total_cents : 0;
   const monthPaid = report ? report.fixed.paid_cents + report.eventual.paid_cents + report.invoice.paid_cents : 0;
   return <>
@@ -60,6 +65,10 @@ export default function Bills({ data, open, remove, change, setMessage }) {
         <Stat label="Fixas · custo de vida" value={brl(report.fixed.total_cents)} detail={`${report.fixed.count} contas · falta ${brl(report.fixed.remaining_cents)}${report.living_cost_share_bp != null ? ` · ${percent(report.living_cost_share_bp)} da renda fixa` : ''}`} />
         <Stat label="Eventuais do mês" value={brl(report.eventual.total_cents)} detail={`${report.eventual.count} despesas · falta ${brl(report.eventual.remaining_cents)}${report.invoice.total_cents ? ` · + ${brl(report.invoice.total_cents)} em faturas` : ''}`} />
       </section>
+      <section className="panel"><div className="panel-header"><div><div className="eyebrow">POR CATEGORIA</div><h2>Para onde vai o dinheiro em {monthName(`${month}-01`)}</h2><p>Despesas que vencem no mês somadas às saídas avulsas, pelo valor original.</p></div><span className="pill">{brl(byCategory.reduce((sum, item) => sum + item.amount_cents, 0))}</span></div><CategoryStrip rows={byCategory} /></section>
+      <section className="panel direct-expenses"><div className="panel-header"><div><div className="eyebrow">DIA A DIA</div><h2>Saídas avulsas do mês</h2><p>Registradas em Lançamentos, inclusive compras no cartão pelo total.</p></div><span className="pill">{brl(directRows.reduce((sum, item) => sum + item.amount_cents, 0))}</span></div>
+        <div className="hidden-scroll"><TransactionTable items={directRows} compact /></div>
+      </section>
       <section className="panel monthly-payables"><div className="panel-header"><div><div className="eyebrow">CONTAS DO MÊS</div><h2>O que pagar em {monthName(`${month}-01`)}</h2><p>Despesas atrasadas continuam nos meses seguintes até serem quitadas, com juros e multa.</p></div></div>
         <div className="monthly-total"><span>Total em aberto</span><strong>{brl(report.remaining_cents)}</strong></div>
         {toPay.length ? <div className="monthly-list">{toPay.map(({ entry, item }) => <div className="monthly-row" key={item.id}><div><strong>{item.description}</strong><small>{entry.carried ? `Pendente desde ${day(item.due_date)}` : `Vence ${day(item.due_date)}`} · {item.account_name}</small></div><span className={entry.overdue ? 'pill carry-pill' : 'pill'}>{item.credit_card_id ? 'Fatura' : entry.overdue ? 'Atrasada' : item.expense_type === 'fixed' ? 'Fixa' : 'Eventual'}</span><b>{brl(entry.value_cents)}</b></div>)}</div> : <Empty>Nada a pagar neste mês.</Empty>}
@@ -68,7 +77,6 @@ export default function Bills({ data, open, remove, change, setMessage }) {
       <div className="inline-filter"><label htmlFor="bill-type-filter">Tipo</label><select id="bill-type-filter" value={type} onChange={event => setType(event.target.value)}><option value="all">Todos os tipos</option><option value="fixed">Fixas</option><option value="eventual">Eventuais</option><option value="invoice">Faturas do cartão</option></select><label htmlFor="bill-category-filter">Categoria</label><select id="bill-category-filter" value={category} onChange={event => setCategory(event.target.value)}><option value="all">Todas as categorias</option>{data.categories.filter(item => item.kind === 'expense').map(item => <option key={item.id} value={item.id}>{item.name}</option>)}</select><label htmlFor="bill-method-filter">Pagamento</label><select id="bill-method-filter" value={method} onChange={event => setMethod(event.target.value)}><option value="all">Todas as formas</option>{Object.entries(methodName).map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select></div>
       <div className="bill-grid">{shown.map(({ entry, item }) => <BillCard key={item.id} item={item} entry={entry} open={open} remove={remove} change={change} setMessage={setMessage} />)}</div>
       {!shown.length && <div className="panel"><Empty>Nenhuma despesa neste filtro.</Empty></div>}
-      {(status === 'all' || status === 'paid') && (type === 'all' || type === 'eventual') && directRows.length > 0 && <section className="panel legacy-panel"><div className="panel-header"><div><h2>Saídas avulsas do mês</h2><p>Registradas em Lançamentos, inclusive compras no cartão</p></div><span className="pill">{brl(directRows.reduce((sum, item) => sum + item.amount_cents, 0))}</span></div><TransactionTable items={directRows} compact /></section>}
     </>}
     <section className="panel chart-panel debt-chart"><div className="panel-header"><div><div className="eyebrow">CENÁRIO</div><h2>Se nada mais for pago</h2><p>Saldo devedor projetado com juros</p></div><RangeButtons value={chartRange} onChange={setChartRange} /></div><LineChart series={data.debt_series.slice(0, chartRange + 1)} title="Projeção de dívidas" accent="#dca792" /></section>
   </>;
