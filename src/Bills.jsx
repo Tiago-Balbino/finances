@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { CategoryStrip, LineChart } from './Charts.jsx';
 import MonthPicker, { useApi } from './MonthPicker.jsx';
 import { brl, day, decimal, methodName, monthName, moveMonth, percent, periodName, statusName } from './lib.js';
-import { Empty, Header, Progress, RangeButtons, Stat, TransactionTable } from './ui.jsx';
+import { Empty, Header, OverdueToggle, Progress, RangeButtons, Stat, TransactionTable } from './ui.jsx';
 
 const fineDelay = { day: 'dia', month: 'mês', year: 'ano' };
 
@@ -34,11 +34,14 @@ export default function Bills({ data, open, remove, change, setMessage }) {
   const [type, setType] = useState('all');
   const [category, setCategory] = useState('all');
   const [method, setMethod] = useState('all');
+  const [withOverdue, setWithOverdue] = useState(true);
   const [chartRange, setChartRange] = useState(12);
   const { value: report, error } = useApi(`/api/bills/month?month=${month}`, data);
   const { value: direct } = useApi(`/api/transactions/month?month=${month}`, data);
   const bills = new Map(data.bills.map(item => [item.id, item]));
-  const entries = (report?.items || []).map(entry => ({ entry, item: bills.get(entry.id) })).filter(row => row.item);
+  const entries = (report?.items || []).filter(entry => withOverdue || !entry.overdue)
+    .map(entry => ({ entry, item: bills.get(entry.id) })).filter(row => row.item);
+  const remaining = report ? (withOverdue ? report.remaining_cents : report.upcoming_cents) : 0;
   const shown = entries.filter(({ item }) => (status === 'all' || item.status === status)
     && (type === 'all' || (item.credit_card_id ? 'invoice' : item.expense_type) === type)
     && (category === 'all' || String(item.category_id) === category)
@@ -54,12 +57,12 @@ export default function Bills({ data, open, remove, change, setMessage }) {
   const monthPaid = report ? report.fixed.paid_cents + report.eventual.paid_cents + report.invoice.paid_cents : 0;
   return <>
     <Header title="Despesas" subtitle="O que é fixo, o que é eventual, o que atrasou e o que ainda vai vencer no mês." action="Nova despesa" onAction={() => data.accounts.length ? open('bill') : setMessage('Cadastre uma conta primeiro.')} />
-    <MonthPicker id="bills-month" value={month} onChange={setMonth} today={data.today} min={report?.first_month?.slice(0, 7)} max={moveMonth(thisMonth, 12)} />
+    <MonthPicker id="bills-month" value={month} onChange={setMonth} today={data.today} min={report?.first_month?.slice(0, 7)} max={moveMonth(thisMonth, 12)}><OverdueToggle value={withOverdue} onChange={setWithOverdue} /></MonthPicker>
     {error && <div className="panel dashboard-error" role="alert">{error}</div>}
     {!report && !error && <div className="panel dashboard-loading">Carregando despesas do mês...</div>}
     {report && <>
       <section className="stats month-stats">
-        <Stat label="Falta pagar" value={brl(report.remaining_cents)} detail={`${brl(report.upcoming_cents)} a vencer · ${brl(report.overdue_cents)} atrasado`} tone="featured"><Progress value={monthPaid} total={monthTotal} label={`${brl(monthPaid)} pagos de ${brl(monthTotal)} do mês`} /><span className="stat-foot">{brl(monthPaid)} pagos de {brl(monthTotal)} que vencem no mês</span></Stat>
+        <Stat label={withOverdue ? 'Falta pagar' : 'Falta pagar, sem atrasadas'} value={brl(remaining)} detail={withOverdue ? `${brl(report.upcoming_cents)} a vencer · ${brl(report.overdue_cents)} atrasado` : `Só o que ainda vai vencer · ${brl(report.overdue_cents)} atrasado fora da conta`} tone="featured"><Progress value={monthPaid} total={monthTotal} label={`${brl(monthPaid)} pagos de ${brl(monthTotal)} do mês`} /><span className="stat-foot">{brl(monthPaid)} pagos de {brl(monthTotal)} que vencem no mês</span></Stat>
         <Stat label="Atrasado" value={brl(report.overdue_cents)} detail={report.overdue_count ? `${report.overdue_count} ${report.overdue_count === 1 ? 'despesa vencida' : 'despesas vencidas'} sem pagamento` : 'Nada vencido'} tone={report.overdue_cents ? 'negative' : 'positive'} />
         <Stat label="Já pago no mês" value={brl(report.paid_cents)} detail={`${report.payments_count} ${report.payments_count === 1 ? 'pagamento' : 'pagamentos'} · ${brl(report.paid_month_bills_cents)} de contas deste mês`} />
         <Stat label="Fixas · custo de vida" value={brl(report.fixed.total_cents)} detail={`${report.fixed.count} contas · falta ${brl(report.fixed.remaining_cents)}${report.living_cost_share_bp != null ? ` · ${percent(report.living_cost_share_bp)} da renda fixa` : ''}`} />
@@ -70,7 +73,7 @@ export default function Bills({ data, open, remove, change, setMessage }) {
         <div className="hidden-scroll"><TransactionTable items={directRows} compact /></div>
       </section>
       <section className="panel monthly-payables"><div className="panel-header"><div><div className="eyebrow">CONTAS DO MÊS</div><h2>O que pagar em {monthName(`${month}-01`)}</h2><p>Despesas atrasadas continuam nos meses seguintes até serem quitadas, com juros e multa.</p></div></div>
-        <div className="monthly-total"><span>Total em aberto</span><strong>{brl(report.remaining_cents)}</strong></div>
+        <div className="monthly-total"><span>{withOverdue ? 'Total em aberto' : 'Total a vencer (sem atrasadas)'}</span><strong>{brl(remaining)}</strong></div>
         {toPay.length ? <div className="monthly-list">{toPay.map(({ entry, item }) => <div className="monthly-row" key={item.id}><div><strong>{item.description}</strong><small>{entry.carried ? `Pendente desde ${day(item.due_date)}` : `Vence ${day(item.due_date)}`} · {item.account_name}</small></div><span className={entry.overdue ? 'pill carry-pill' : 'pill'}>{item.credit_card_id ? 'Fatura' : entry.overdue ? 'Atrasada' : item.expense_type === 'fixed' ? 'Fixa' : 'Eventual'}</span><b>{brl(entry.value_cents)}</b></div>)}</div> : <Empty>Nada a pagar neste mês.</Empty>}
       </section>
       <div className="section-heading"><div><h2>Despesas do mês</h2><p>As que vencem em {monthName(`${month}-01`)} e as atrasadas ainda em aberto.</p></div><div className="filter-row">{[['all', 'Todas'], ['pending', 'Pendentes'], ['overdue', 'Vencidas'], ['paid', 'Pagas']].map(([value, label]) => <button key={value} className={`filter ${status === value ? 'active' : ''}`} onClick={() => setStatus(value)}>{label}</button>)}</div></div>

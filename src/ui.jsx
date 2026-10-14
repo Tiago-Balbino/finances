@@ -28,3 +28,7 @@ export function TransactionTable({ items, onEdit, onDelete, compact = false }) {
     {!compact && <td>{item.bill_id ? <span className="muted">Pagamento</span> : item.planned_income_id ? <span className="muted">Recebimento</span> : item.automatic_yield ? <span className="muted">Rendimento automático</span> : item.movement_type === 'transfer' ? <div className="table-actions"><button className="button tiny ghost" onClick={() => onDelete(item.id, 'Excluir este aporte ou resgate do limite garantido?')}>Excluir</button></div> : <div className="table-actions"><button className="button tiny ghost" onClick={() => onEdit(item)}>Editar</button><button className="button tiny ghost" onClick={() => onDelete(item.id, item.card_purchase_id ? 'Excluir esta compra e todas as parcelas?' : undefined)}>{item.card_purchase_id ? 'Excluir compra' : 'Excluir'}</button></div>}</td>}
   </tr>)}</tbody></table></div>;
 }
+
+export function OverdueToggle({ value, onChange }) {
+  return <div className="segmented" role="group" aria-label="Itens atrasados"><button type="button" className={value ? 'selected' : ''} aria-pressed={value} onClick={() => onChange(true)}>Com atrasadas</button><button type="button" className={value ? '' : 'selected'} aria-pressed={!value} onClick={() => onChange(false)}>Sem atrasadas</button></div>;
+}

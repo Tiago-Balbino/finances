@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { SourceList } from './Charts.jsx';
 import MonthPicker, { useApi } from './MonthPicker.jsx';
 import { brl, day, monthName, moveMonth } from './lib.js';
-import { Empty, Header, Stat } from './ui.jsx';
+import { Empty, Header, OverdueToggle, Stat } from './ui.jsx';
 
 const incomeStatus = { pending: 'Pendente', overdue: 'Atrasada', received: 'Recebida' };
 
@@ -29,30 +29,33 @@ export default function Incomes({ data, open, remove, change, setMessage }) {
   const [month, setMonth] = useState(thisMonth);
   const [status, setStatus] = useState('all');
   const [type, setType] = useState('all');
+  const [withOverdue, setWithOverdue] = useState(true);
   const { value: report, error } = useApi(`/api/incomes/month?month=${month}`, data);
   const incomes = new Map((data.incomes || []).map(item => [item.id, item]));
   const entries = new Map((report?.items || []).map(entry => [entry.id, entry]));
+  const expected = report ? (withOverdue ? report.expected_cents : report.upcoming_cents) : 0;
   const start = `${month}-01`;
   // Everything planned for the month (received or not) plus earlier incomes still pending.
   const shown = (data.incomes || []).filter(item => (item.due_date.slice(0, 7) === month || entries.has(item.id))
+    && (withOverdue || !entries.get(item.id)?.overdue)
     && (status === 'all' || item.status === status) && (type === 'all' || item.income_type === type));
-  const toReceive = (report?.items || []).filter(entry => entry.remaining_cents > 0).map(entry => ({ entry, item: incomes.get(entry.id) })).filter(row => row.item);
+  const toReceive = (report?.items || []).filter(entry => entry.remaining_cents > 0 && (withOverdue || !entry.overdue)).map(entry => ({ entry, item: incomes.get(entry.id) })).filter(row => row.item);
   return <>
     <Header title="Entradas" subtitle="Quanto entrou, quanto rendeu e quanto ainda vai entrar no mês." action="Nova entrada" onAction={() => data.accounts.length ? open('income') : setMessage('Cadastre uma conta primeiro.')} />
-    <MonthPicker id="incomes-month" value={month} onChange={setMonth} today={data.today} min={report?.first_month?.slice(0, 7)} max={moveMonth(thisMonth, 12)} />
+    <MonthPicker id="incomes-month" value={month} onChange={setMonth} today={data.today} min={report?.first_month?.slice(0, 7)} max={moveMonth(thisMonth, 12)}><OverdueToggle value={withOverdue} onChange={setWithOverdue} /></MonthPicker>
     {error && <div className="panel dashboard-error" role="alert">{error}</div>}
     {!report && !error && <div className="panel dashboard-loading">Carregando entradas do mês...</div>}
     {report && <>
       <section className="stats month-stats four">
         <Stat label="Recebido no mês" value={brl(report.received_cents)} detail={`Inclui ${brl(report.yield_cents)} de rendimentos`} tone="featured" />
         <Stat label="Rendimentos no mês" value={brl(report.yield_cents)} detail="Créditos automáticos das contas com taxa" tone="positive" />
-        <Stat label="Ainda vai entrar" value={brl(report.expected_cents)} detail={`${brl(report.upcoming_cents)} previsto · ${brl(report.overdue_cents)} atrasado`} tone={report.overdue_cents ? 'negative' : ''} />
+        <Stat label={withOverdue ? 'Ainda vai entrar' : 'Ainda vai entrar, sem atrasadas'} value={brl(expected)} detail={withOverdue ? `${brl(report.upcoming_cents)} previsto · ${brl(report.overdue_cents)} atrasado` : `Só o que ainda está previsto · ${brl(report.overdue_cents)} atrasado fora da conta`} tone={withOverdue && report.overdue_cents ? 'negative' : ''} />
         <Stat label="Entradas fixas previstas" value={brl(report.fixed_expected_cents)} detail="Salários e outras entradas que se repetem" />
       </section>
       <div className="grid-two dashboard-charts">
         <section className="panel"><div className="panel-header"><div><div className="eyebrow">ORIGEM</div><h2>Quanto entrou por categoria</h2><p>Recebimentos de {monthName(start)}, inclusive rendimentos.</p></div></div><SourceList rows={report.categories} /></section>
         <section className="panel monthly-payables"><div className="panel-header"><div><div className="eyebrow">A RECEBER</div><h2>O que ainda vai entrar</h2><p>Entradas pendentes continuam nos meses seguintes até serem recebidas.</p></div></div>
-          <div className="monthly-total"><span>Total a receber</span><strong>{brl(report.expected_cents)}</strong></div>
+          <div className="monthly-total"><span>{withOverdue ? 'Total a receber' : 'Total previsto (sem atrasadas)'}</span><strong>{brl(expected)}</strong></div>
           {toReceive.length ? <div className="monthly-list">{toReceive.map(({ entry, item }) => <div className="monthly-row" key={item.id}><div><strong>{item.description}</strong><small>{entry.carried ? `Pendente desde ${day(item.due_date)}` : `Prevista para ${day(item.due_date)}`} · {item.account_name}</small></div><span className={entry.overdue ? 'pill carry-pill' : 'pill'}>{entry.overdue ? 'Atrasada' : item.income_type === 'fixed' ? 'Fixa' : 'Eventual'}</span><b>{brl(entry.remaining_cents)}</b></div>)}</div> : <Empty>Nada a receber neste mês.</Empty>}
         </section>
       </div>
