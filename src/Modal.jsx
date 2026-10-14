@@ -34,6 +34,7 @@ export default function Modal({ modal, data, onClose, onSave }) {
   const [expenseType, setExpenseType] = useState(record.expense_type || 'eventual');
   const [incomeType, setIncomeType] = useState(record.income_type || 'eventual');
   const [yieldRateId, setYieldRateId] = useState(String(record.yield_rate_id || ''));
+  const [rateSource, setRateSource] = useState(record.source_code || 'manual');
   const title = ({ account: record.id ? 'Editar conta' : 'Nova conta', bill: record.id ? 'Editar despesa' : 'Nova despesa',
     income: record.id ? 'Editar entrada' : 'Nova entrada', receipt: 'Registrar recebimento',
     transaction: record.id ? 'Editar lançamento' : 'Novo lançamento', investment: 'Novo investimento',
@@ -110,8 +111,9 @@ export default function Modal({ modal, data, onClose, onSave }) {
           <Field label="Data inicial" name="startDate" type="date" value={data.today} />{noteField}
         </>}
         {type === 'yieldRate' && <><Field label="Nome da taxa" name="name" value={record.name} maxLength={80} placeholder="Ex.: CDI" />
-          <Field label="Valor da taxa (% ao ano)" name="annualRate" type="number" value={record.id ? decimal(record.annual_basis_points) : ''} min="0" max="100" step="0.01" />
-          <p className="form-hint wide">Cadastre aqui o valor anual da taxa de referência. Cada conta escolhe uma taxa e o percentual aplicado a ela.</p></>}
+          <Select label="Origem do valor" name="sourceCode" value={rateSource} onChange={event => setRateSource(event.target.value)} options={[["manual", "Manual"], ["cdi", "CDI · Banco Central"], ["selic_target", "Selic Meta · Banco Central"]]} />
+          {rateSource === 'manual' && <Field label="Valor da taxa (% ao ano)" name="annualRate" type="number" value={record.id ? decimal(record.annual_basis_points) : ''} min="0" max="100" step="0.01" />}
+          <p className="form-hint wide">{rateSource === 'manual' ? 'Você define o valor anual. Cada conta escolhe esta taxa e um percentual dela.' : 'O valor anual será consultado no Banco Central. A conta pode render, por exemplo, 105% desta taxa.'}</p></>}
         {type === 'payment' && <>
           <p className="form-hint wide">Saldo atualizado de <b>{brl(record.current_cents)}</b>. Pagamentos parciais são aceitos.</p>
           <Select label="Pagar pela conta" name="accountId" value={selectedAccount} options={accounts} />

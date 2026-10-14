@@ -80,6 +80,13 @@ export default function App() {
     await refresh();
     setMessage('Alteração salva com sucesso.');
   }
+  async function syncRates() {
+    try {
+      const result = await api('/api/yield-rates/sync', 'POST');
+      await refresh();
+      setMessage(Object.keys(result.errors || {}).length ? 'Banco Central indisponível para alguns indicadores. O último valor conhecido foi mantido.' : 'Taxas atualizadas pelo Banco Central.');
+    } catch (error) { setMessage(error.message); }
+  }
   async function remove(path, confirmation = 'Excluir este registro? Esta ação não pode ser desfeita.') {
     if (!window.confirm(confirmation)) return;
     try { await change(path, 'DELETE'); } catch (error) { setMessage(error.message); }
@@ -94,7 +101,7 @@ export default function App() {
     if (type === 'receipt') return change(`/api/incomes/${record.id}/receipts`, 'POST', { accountId: Number(values.accountId), amountCents: cents(values.amount), date: values.date, note: values.note });
     if (type === 'transaction') return change(record?.id ? `/api/transactions/${record.id}` : '/api/transactions', record?.id ? 'PATCH' : 'POST', { kind: values.kind, accountId: Number(values.accountId), description: values.description, ...selected, note: values.note, amountCents: cents(values.amount), date: values.date });
     if (type === 'investment') return change('/api/investments', 'POST', { name: values.name, type: values.type, principalCents: cents(values.principal), rateBasisPoints: rate(values.rate), period: values.period, startDate: values.startDate, note: values.note });
-    if (type === 'yieldRate') return change(record?.id ? `/api/yield-rates/${record.id}` : '/api/yield-rates', record?.id ? 'PATCH' : 'POST', { name: values.name, annualBasisPoints: rate(values.annualRate) });
+    if (type === 'yieldRate') return change(record?.id ? `/api/yield-rates/${record.id}` : '/api/yield-rates', record?.id ? 'PATCH' : 'POST', { name: values.name, sourceCode: values.sourceCode === 'manual' ? null : values.sourceCode, annualBasisPoints: values.sourceCode === 'manual' ? rate(values.annualRate) : null });
     if (type === 'payment') return change(`/api/bills/${record.id}/payments`, 'POST', { accountId: Number(values.accountId), amountCents: cents(values.amount), date: values.date, note: values.note });
     if (type === 'interest') return change(`/api/bills/${record.id}/interest`, 'PATCH', { interestRateBasisPoints: rate(values.interestRate), interestPeriod: values.interestPeriod });
     if (type === 'billNote') return change(`/api/bills/${record.id}/note`, 'PATCH', { note: values.note });
@@ -146,10 +153,13 @@ export default function App() {
     <p className="muted">Configure as taxas de referência na aba <button className="link-button" onClick={() => setView('yieldRates')}>Taxas →</button></p>
   </>;
   if (view === 'yieldRates') page = <>
-    <Header title="Taxas de referência" subtitle="Cadastre o valor anual de taxas como CDI para usar nos rendimentos das contas." action="Nova taxa" onAction={() => open('yieldRate')} />
+    <Header title="Taxas de referência" subtitle="Crie taxas manuais ou vinculadas ao CDI e à Selic Meta do Banco Central." action="Nova taxa" onAction={() => open('yieldRate')} />
+    {data.yield_rates.some(item => item.source_code) && <div className="rate-sync-row"><span>Taxas automáticas são consultadas diariamente e antes do rendimento das contas.</span><button className="button tiny secondary" onClick={syncRates}>Atualizar agora</button></div>}
     <div className="cards">{data.yield_rates.map(item => <article className="item-card" key={item.id}>
-      <div className="item-top"><span className="account-icon">％</span><span className="pill">Taxa anual</span></div>
+      <div className="item-top"><span className="account-icon">％</span><span className="pill">{item.source_code ? 'Automática' : 'Manual'}</span></div>
       <h3>{item.name}</h3><div className="big-value">{decimal(item.annual_basis_points)}%</div>
+      {item.source_code && <p className="rate-source-detail">{item.source_code === 'cdi' ? 'CDI' : 'Selic Meta'} · Banco Central{item.source_date ? ` · Referência ${day(item.source_date)}` : ''}</p>}
+      {item.sync_error && <p className="rate-sync-error" role="status">{item.sync_error}</p>}
       <div className="item-actions"><button className="button tiny secondary" onClick={() => open('yieldRate', item)}>Editar</button><button className="button tiny ghost" onClick={() => remove(`/api/yield-rates/${item.id}`)}>Excluir</button></div>
     </article>)}</div>
     {!data.yield_rates.length && <div className="panel"><Empty>Cadastre uma taxa para configurar rendimentos passivos nas contas.</Empty></div>}
